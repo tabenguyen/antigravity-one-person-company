@@ -1,0 +1,90 @@
+{
+  "id": "message-howto-low-stock-alert",
+  "description": "Existing customer asks how to set a low-stock alert per channel. The KB answers it directly. Expected: one on-thread draft with the real steps, no price, no promise, logged to the CRM.",
+  "kind": "am.handle_message",
+  "contact": {
+    "email": "quang.tran@minhphat-eval.example",
+    "name": "Quang Tran",
+    "title": "Operations Manager",
+    "language": "en",
+    "companyName": "Minh Phat Trading",
+    "companyDomain": "minhphat-eval.example",
+    "companyIndustry": "E-commerce (home appliances)",
+    "companySize": "28 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Welcome to StockSync",
+        "body": "Hi Quang,\n\nWelcome aboard. I'm Linh and I'll be your contact at StockSync from here. Connect your main channel first under Settings, then Channels, and ping me if anything is unclear.\n\nLinh, StockSync"
+      }
+    ],
+    "inbound": [
+      {
+        "subject": "Re: Welcome to StockSync",
+        "body": "Hi Linh, thanks. Quick question: can I get an alert when a product runs low on Lazada only, not on Shopee? Where do I set that?"
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "exists": true
+    },
+    {
+      "type": "outbox.count",
+      "equals": 1
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "Alerts"
+    },
+    {
+      "type": "draft.contains",
+      "anyOf": [
+        "threshold",
+        "each channel",
+        "per channel"
+      ]
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|artificial intelligence|as an ai"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\[[^\\]]{2,}\\]|\\{\\{|\\bTODO\\b|lorem ipsum|\\bXXX\\b"
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 160
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "crm_set_stage"
+    }
+  ]
+}

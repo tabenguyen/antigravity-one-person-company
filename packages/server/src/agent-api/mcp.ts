@@ -14,6 +14,7 @@ import { evaluatePolicy } from "./policy.ts";
 import { truncatedString } from "./audit-util.ts";
 import { readJsonBody } from "./body.ts";
 import type { ResolvedDeps } from "./deps.ts";
+import { handoffContact } from "../handoff.ts";
 import { formatFindings, hasLintErrors, lintNewDraft } from "../quality/index.ts";
 
 const SYSTEM_MANAGED_STAGES = new Set(["contacted", "replied"]);
@@ -138,6 +139,14 @@ export function registerMcpRoutes(app: Hono, deps: ResolvedDeps): void {
       wakeAt,
     });
     return { task } satisfies McpToolOutputs["task_create"];
+  });
+
+  registerTool(app, deps, "contact_handoff", async (ctx, input) => {
+    const result = handoffContact(
+      { db: ctx.db, emit: ctx.deps.emit, taskKindsFor: ctx.deps.taskKindsFor, followUpKindsFor: ctx.deps.followUpKindsFor },
+      { contactId: input.contactId, toRole: input.toRole, summary: input.summary, actor: { type: "agent", agentId: ctx.agentId, taskId: ctx.taskId } },
+    );
+    return result satisfies McpToolOutputs["contact_handoff"];
   });
 
   registerTool(app, deps, "outbox_draft_email", async (ctx, input) => {

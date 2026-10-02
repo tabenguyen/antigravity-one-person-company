@@ -98,6 +98,16 @@ class EventHub {
       "outbound.auto_paused",
       "setup.job.updated",
       "setup.job.progress",
+      "contact.handoff",
+      "briefing.created",
+      // Emitted by the daemon and watched by pages (useApi refreshOn); without a listener here they never arrive.
+      "task.created",
+      "agent.created",
+      "agent.updated",
+      "contact.upserted",
+      "contact.imported",
+      "memory.updated",
+      "kb.synced",
     ];
     for (const t of knownTypes) {
       es.addEventListener(t, (ev) => this.dispatch(ev as MessageEvent));

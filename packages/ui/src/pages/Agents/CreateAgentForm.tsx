@@ -2,6 +2,9 @@ import { useState, type FormEvent } from "react";
 import { api, ApiError } from "../../api/client.ts";
 import { useToast } from "../../components/Toast.tsx";
 import type { AgentRole } from "../../api/types.ts";
+import { ROLE_INFO } from "../../lib/roles.ts";
+
+const ID_HINT: Record<string, string> = { "sales-sdr": "sdr-02", "account-manager": "am-01", "chief-of-staff": "cos-01" };
 
 export function CreateAgentForm({ roles, onClose, onCreated }: { roles: AgentRole[]; onClose: () => void; onCreated: () => void }) {
   const { notify } = useToast();
@@ -42,18 +45,20 @@ export function CreateAgentForm({ roles, onClose, onCreated }: { roles: AgentRol
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label htmlFor="agent-id">Id (slug)</label>
-            <input id="agent-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="sdr-02" required />
+            <input id="agent-id" value={id} onChange={(e) => setId(e.target.value)} placeholder={ID_HINT[role] ?? "agent-01"} required />
           </div>
-          <div className="field">
-            <label htmlFor="agent-role">Role</label>
-            <select id="agent-role" value={role} onChange={(e) => setRole(e.target.value as AgentRole)}>
-              {roles.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
+          <fieldset className="field role-picker">
+            <legend>Role</legend>
+            {roles.map((r) => (
+              <label key={r} className={`role-option ${role === r ? "selected" : ""}`}>
+                <input type="radio" name="agent-role" value={r} checked={role === r} onChange={() => setRole(r)} />
+                <span>
+                  <strong>{ROLE_INFO[r]?.label ?? r}</strong>
+                  <span className="role-desc">{ROLE_INFO[r]?.description ?? ""}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <div className="field">
             <label htmlFor="agent-display-name">Display name</label>
             <input id="agent-display-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />

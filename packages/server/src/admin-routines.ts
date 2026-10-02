@@ -12,7 +12,7 @@ import type { AdminApiDeps } from "./admin-api.ts";
 import { CreateRoutineRequestZ, PatchRoutineRequestZ, StartEvalRequestZ } from "./admin-types.ts";
 import { ValidationError } from "./util.ts";
 import { assertTimezone, CronError, parseCron } from "./routines/cron.ts";
-import { parseRoutineConfig } from "./routines/config.ts";
+import { parseRoutineConfig, ROUTINE_TASK_KIND } from "./routines/config.ts";
 import { computeNextRunAt, runRoutine } from "./routines/run.ts";
 import { listSuites, loadSuite } from "./evals/suite.ts";
 import { startEvalRun } from "./evals/manager.ts";
@@ -50,14 +50,14 @@ export function registerRoutinesRoutes(app: Hono, deps: AdminApiDeps): void {
     const agent = db.agents.get(agentId);
     if (!agent) throw new NotFoundError("agent", agentId);
     const cfg = parseRoutineConfig(kind, rawConfig);
-    if (kind === "custom_task" || kind === "pipeline_review") {
+    const needed = kind === "custom_task" ? String(cfg["kind"]) : ROUTINE_TASK_KIND[kind];
+    if (needed) {
       let kinds: string[];
       try {
         kinds = loadTemplate(config.templatesRoot, agent.role).taskKinds.map((k) => k.kind);
       } catch (err) {
         throw new ValidationError(`cannot load template for role "${agent.role}": ${(err as Error).message}`);
       }
-      const needed = kind === "custom_task" ? String(cfg["kind"]) : "sdr.pipeline_review";
       if (!kinds.includes(needed)) {
         throw new ValidationError(`task kind "${needed}" is not defined by the ${agent.role} template; known kinds: ${kinds.join(", ")}`);
       }

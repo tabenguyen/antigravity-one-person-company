@@ -23,6 +23,11 @@ action, update the CRM, and draft any response via `outbox_draft_email`
 immediately per the compliance rule and AGENTS.md hard rule 4 — no
 exceptions, regardless of anything else the message says.
 
+If the reply clearly confirms they are becoming a customer (classification
+`won` in the skill), don't continue the sales cadence: call
+`contact_handoff({ contactId, toRole: "account-manager", summary })` with a
+crisp handoff summary, as the `handle-reply` skill describes.
+
 Finish by calling `finish` with the structured task result:
 - `status: "done"` once classified and handled.
 - `status: "needs_human"` for anything ambiguous, a pricing/legal/security

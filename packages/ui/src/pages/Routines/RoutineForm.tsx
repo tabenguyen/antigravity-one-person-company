@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client.ts";
 import { routinesApi, type Routine, type RoutineKind } from "../../api/routines.ts";
-import type { Agent, LeadStage } from "../../api/types.ts";
+import type { Agent, AgentRole, LeadStage } from "../../api/types.ts";
+import { roleLabel } from "../../lib/roles.ts";
 import { useToast } from "../../components/Toast.tsx";
 import { nextRuns, validateSchedule } from "./cron.ts";
 
@@ -17,8 +18,27 @@ export const SCHEDULE_PRESETS: { id: string; label: string; cron: string }[] = [
 export const KIND_LABELS: Record<RoutineKind, string> = {
   prospecting: "Prospecting — research the next uncontacted leads",
   pipeline_review: "Pipeline review — flag stale leads, schedule follow-ups",
+  account_review: "Account review — check customer accounts, flag at-risk ones, schedule check-ins",
+  daily_digest: "Daily digest — write a briefing for the owner",
   custom_task: "Custom task — create a task each run",
 };
+
+/** Role an agent needs for each routine kind (the daemon rejects kinds the agent's template doesn't define). null = any role. */
+export const KIND_ROLE: Record<RoutineKind, AgentRole | null> = {
+  prospecting: "sales-sdr",
+  pipeline_review: "sales-sdr",
+  account_review: "account-manager",
+  daily_digest: "chief-of-staff",
+  custom_task: null,
+};
+
+const KIND_ORDER: RoutineKind[] = ["prospecting", "pipeline_review", "account_review", "daily_digest", "custom_task"];
+
+/** Agents that can run a routine of this kind (archived agents never). */
+export function eligibleAgents(agents: Agent[], kind: RoutineKind): Agent[] {
+  const role = KIND_ROLE[kind];
+  return agents.filter((a) => a.status !== "archived" && (role === null || a.role === role));
+}
 
 const STAGES: LeadStage[] = ["new", "researching", "contacted", "replied", "qualified", "meeting_booked", "disqualified", "nurture"];
 
@@ -58,6 +78,10 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
 
   const [agentId, setAgentId] = useState(routine?.agentId ?? agents.find((a) => a.role === "sales-sdr")?.id ?? agents[0]?.id ?? "");
   const [kind, setKind] = useState<RoutineKind>(routine?.kind ?? "prospecting");
+  const editedAgent = routine ? agents.find((a) => a.id === routine.agentId) : undefined;
+  // Creating: the kind picks the agent list. Editing: the agent is fixed, so only kinds its role can run are offered.
+  const kindOptions = editedAgent ? KIND_ORDER.filter((k) => KIND_ROLE[k] === null || KIND_ROLE[k] === editedAgent.role) : KIND_ORDER;
+  const agentOptions = editing ? agents.filter((a) => a.id === agentId) : eligibleAgents(agents, kind);
   const [name, setName] = useState(routine?.name ?? "");
   const [preset, setPreset] = useState(routine ? presetFor(routine.schedule) : "weekdays-9");
   const [customCron, setCustomCron] = useState(routine?.schedule ?? "0 9 * * 1-5");
@@ -68,6 +92,9 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
   const [batchSize, setBatchSize] = useState(String(cfg["batchSize"] ?? 5));
   const [stages, setStages] = useState<LeadStage[]>(Array.isArray(cfg["stages"]) ? (cfg["stages"] as LeadStage[]) : ["new"]);
   const [staleAfterDays, setStaleAfterDays] = useState(String(cfg["staleAfterDays"] ?? 7));
+  const [maxAccounts, setMaxAccounts] = useState(String(cfg["maxAccounts"] ?? 40));
+  const [reviewStaleDays, setReviewStaleDays] = useState(String(cfg["staleAfterDays"] ?? 14));
+  const [lookbackHours, setLookbackHours] = useState(String(cfg["lookbackHours"] ?? 24));
   const [taskKind, setTaskKind] = useState(String(cfg["kind"] ?? "sdr.follow_up"));
   const [taskTitle, setTaskTitle] = useState(String(cfg["title"] ?? ""));
   const [taskInput, setTaskInput] = useState(JSON.stringify(cfg["input"] ?? {}, null, 2));
@@ -78,6 +105,13 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
   const schedule = preset === "custom" ? customCron.trim().replace(/\s+/g, " ") : SCHEDULE_PRESETS.find((p) => p.id === preset)!.cron;
   const scheduleCheck = useMemo(() => validateSchedule(schedule, timezone), [schedule, timezone]);
   const upcoming = useMemo(() => (scheduleCheck.ok ? nextRuns(schedule, timezone, new Date(), 3) : []), [scheduleCheck, schedule, timezone]);
+
+  function changeKind(next: RoutineKind) {
+    setKind(next);
+    if (editing) return;
+    const eligible = eligibleAgents(agents, next);
+    if (!eligible.some((a) => a.id === agentId)) setAgentId(eligible[0]?.id ?? "");
+  }
 
   function toggleStage(stage: LeadStage) {
     setStages((prev) => (prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage]));
@@ -95,6 +129,18 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
       if (!Number.isInteger(d) || d < 1 || d > 90) throw new Error("Stale after must be a whole number of days from 1 to 90.");
       return { staleAfterDays: d };
     }
+    if (kind === "account_review") {
+      const n = Number(maxAccounts);
+      if (!Number.isInteger(n) || n < 1 || n > 200) throw new Error("Max accounts must be a whole number from 1 to 200.");
+      const d = Number(reviewStaleDays);
+      if (!Number.isInteger(d) || d < 1 || d > 180) throw new Error("Stale after must be a whole number of days from 1 to 180.");
+      return { maxAccounts: n, staleAfterDays: d };
+    }
+    if (kind === "daily_digest") {
+      const h = Number(lookbackHours);
+      if (!Number.isInteger(h) || h < 1 || h > 168) throw new Error("Look-back must be a whole number of hours from 1 to 168.");
+      return { lookbackHours: h };
+    }
     if (!taskKind.trim()) throw new Error("Task kind is required (e.g. sdr.follow_up).");
     if (!taskTitle.trim()) throw new Error("Task title is required.");
     let input: unknown;
@@ -110,7 +156,10 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!agentId) return setError("Pick an agent.");
+    if (!agentId) {
+      const role = KIND_ROLE[kind];
+      return setError(role ? `Pick an agent. This kind needs a ${roleLabel(role)} agent — create one on the Agents page first.` : "Pick an agent.");
+    }
     if (!name.trim()) return setError("Name is required.");
     if (!scheduleCheck.ok) return setError(scheduleCheck.error);
     let config: Record<string, unknown>;
@@ -145,17 +194,18 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
             <div className="field">
               <label htmlFor="rt-agent">Agent</label>
               <select id="rt-agent" value={agentId} onChange={(e) => setAgentId(e.target.value)} disabled={editing}>
-                {agents.map((a) => (
+                {agentOptions.length === 0 && <option value="">No eligible agent</option>}
+                {agentOptions.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.displayName} ({a.id})
+                    {a.displayName} ({a.id}){KIND_ROLE[kind] === null ? ` · ${roleLabel(a.role)}` : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div className="field">
               <label htmlFor="rt-kind">Kind</label>
-              <select id="rt-kind" value={kind} onChange={(e) => setKind(e.target.value as RoutineKind)}>
-                {(Object.keys(KIND_LABELS) as RoutineKind[]).map((k) => (
+              <select id="rt-kind" value={kind} onChange={(e) => changeKind(e.target.value as RoutineKind)}>
+                {kindOptions.map((k) => (
                   <option key={k} value={k}>
                     {KIND_LABELS[k]}
                   </option>
@@ -229,6 +279,28 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
             <div className="field">
               <label htmlFor="rt-stale">Stale after (days without a reply or scheduled follow-up)</label>
               <input id="rt-stale" type="number" min={1} max={90} value={staleAfterDays} onChange={(e) => setStaleAfterDays(e.target.value)} />
+            </div>
+          )}
+
+          {kind === "account_review" && (
+            <div className="rt-form-grid">
+              <div className="field">
+                <label htmlFor="rt-max-accounts">Max accounts per run (1-200)</label>
+                <input id="rt-max-accounts" type="number" min={1} max={200} value={maxAccounts} onChange={(e) => setMaxAccounts(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="rt-review-stale">Stale after (days, 1-180)</label>
+                <input id="rt-review-stale" type="number" min={1} max={180} value={reviewStaleDays} onChange={(e) => setReviewStaleDays(e.target.value)} />
+              </div>
+              <span className="faint rt-wide">Reviews customers owned by the chosen Account Manager, quietest first. Nothing is queued when there are no customers.</span>
+            </div>
+          )}
+
+          {kind === "daily_digest" && (
+            <div className="field">
+              <label htmlFor="rt-lookback">Look-back window (hours, 1-168)</label>
+              <input id="rt-lookback" type="number" min={1} max={168} value={lookbackHours} onChange={(e) => setLookbackHours(e.target.value)} />
+              <span className="faint">The Chief of Staff summarizes this much recent activity into a briefing you can read on the Briefings page.</span>
             </div>
           )}
 

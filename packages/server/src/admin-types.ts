@@ -354,6 +354,8 @@ export const PatchSettingsRequestZ = z
     sendRatePerHour: z.number().int().min(0).max(10_000),
     autoTrip: z.object({ windowSize: z.number().int().min(1).max(10_000), maxBounceRate: z.number().min(0).max(1) }),
     defaultSdrAgentId: z.string().min(1).nullable(),
+    defaultAmAgentId: z.string().min(1).nullable(),
+    defaultCosAgentId: z.string().min(1).nullable(),
     autonomousRequiresPriorApproval: z.boolean(),
   })
   .partial()
@@ -441,7 +443,7 @@ export type { LintFinding };
 // POST   /v1/admin/evals body StartEvalRequest    → EvalRunResponse (starts async; poll or watch SSE "eval.updated")
 export const CreateRoutineRequestZ = z.object({
   agentId: z.string().min(1),
-  kind: z.enum(["prospecting", "pipeline_review", "custom_task"]),
+  kind: z.enum(["prospecting", "pipeline_review", "account_review", "daily_digest", "custom_task"]),
   name: z.string().min(1).max(200),
   schedule: z.string().min(9).max(100), // 5-field cron
   timezone: z.string().default("Asia/Ho_Chi_Minh"),
@@ -597,3 +599,126 @@ export const SenderSettingsInputZ = z.object({
 });
 export type SenderSettingsInput = z.infer<typeof SenderSettingsInputZ>;
 export type SenderSettingsResponse = ApiEnvelope<{ sender: SenderSettingsInput & { source: "ui" | "config" } }>;
+
+// ===========================================================================
+// Phase 4 additions — CONTRACT (docs/PHASE4.md). Implemented in
+// admin-coordination.ts (handoff, kpis, briefings); the rest extends routes above.
+// ===========================================================================
+
+import type { Briefing, Contact } from "@agyhq/core";
+
+// --- Handoff -----------------------------------------------------------------
+// POST /v1/admin/contacts/:id/handoff body HandoffContactRequest → HandoffContactResponse
+//   The human "Won -> hand to Account Manager" button. Same effect as the agents' `contact_handoff` MCP tool, but
+//   allowed from any stage (a human can also reassign a customer to a different AM). Target = settings.defaultAmAgentId.
+//   400 invalid_request: no/inactive default AM, contact without an email, template lacks am.onboard.
+//   404 contact not found. 409 conflict: contact is already owned by the target.
+export const HandoffContactRequestZ = z.object({
+  toRole: z.literal("account-manager").default("account-manager"),
+  summary: z.string().trim().max(2000).default(""),
+});
+export type HandoffContactRequest = z.input<typeof HandoffContactRequestZ>;
+export type HandoffContactResponse = ApiEnvelope<{ contact: Contact; task: Task; fromAgentId: string | null; toAgentId: string }>;
+
+// --- Settings ------------------------------------------------------------------
+// PATCH /v1/admin/settings also accepts defaultAmAgentId (an active account-manager agent) and
+// defaultCosAgentId (an active chief-of-staff agent), or null to clear. 400 otherwise.
+
+// --- KPIs ------------------------------------------------------------------------
+// GET /v1/admin/kpis?days=7 → KpiResponse   (days: integer 1..365, default 7)
+// Counts are plain numbers (0 is a real count). Rates/medians are null when there is nothing to divide — never a fake 0.
+// Window = tasks/drafts CREATED in the last `days` days (same cohorting as stats/scorecards); "emailsSent" and the
+// stage counts use the time of the send / stage change.
+export interface SdrKpis {
+  /** Non-archived sales-sdr agents. */
+  agents: number;
+  /** sdr.research_lead tasks that finished done. */
+  leadsResearched: number;
+  /** Drafts created by sdr.first_touch tasks (any status). */
+  firstTouchDrafted: number;
+  /** Emails sent by SDR agents. */
+  emailsSent: number;
+  /** Inbound replies routed to an SDR agent. */
+  replies: number;
+  /** replies / emailsSent, capped at 1; null when nothing was sent. */
+  replyRate: number | null;
+  /** Contacts moved to stage "qualified" / "meeting_booked" (distinct, from the stage-change notes). */
+  qualified: number;
+  meetingsBooked: number;
+  /** contact.handoff events (all agents/humans). */
+  handoffs: number;
+}
+export interface AmKpis {
+  agents: number;
+  /** Contacts currently at stage "customer" (point in time, not windowed). */
+  accounts: number;
+  /** am.handle_message tasks finished done. */
+  messagesHandled: number;
+  /** Median minutes from a customer message to the first email SENT in answer; null when none was sent yet. */
+  medianFirstResponseMinutes: number | null;
+  /** Times an AM task was handed to a human (needs_human). */
+  escalations: number;
+  /** Drafts created by am.check_in tasks. */
+  checkInsDrafted: number;
+  /** Contacts moved to stage "churned". */
+  churned: number;
+}
+export interface CosKpis {
+  agents: number;
+  /** cos.triage tasks that finished (done or handed to a human). */
+  triaged: number;
+  /** ...of which result.data.decision.action = "delegated". */
+  delegated: number;
+  /** cos.triage tasks handed to a human. */
+  escalated: number;
+  /** Briefings stored. */
+  digests: number;
+}
+export interface CommonKpis {
+  tasksDone: number;
+  tasksFailed: number;
+  /** Times any agent handed a task to a human. */
+  needsHuman: number;
+  /** Over all drafts decided in the window: approved / (approved + human-rejected); null when none decided. */
+  approvalRate: number | null;
+  /** Median normalized edit distance of approved drafts; null when none. */
+  medianEditRatio: number | null;
+}
+export interface KpiReport {
+  windowDays: number;
+  roles: { "sales-sdr": SdrKpis; "account-manager": AmKpis; "chief-of-staff": CosKpis };
+  common: CommonKpis;
+}
+export type KpiResponse = ApiEnvelope<KpiReport>;
+
+// --- Briefings ---------------------------------------------------------------------
+// GET /v1/admin/briefings?limit=&agentId= → ListBriefingsResponse (latest first; limit default 30, max 500)
+// GET /v1/admin/briefings/:id             → GetBriefingResponse
+// Stored by the orchestrator when a cos.daily_digest task finishes done with data.digestMarkdown.
+// SSE: "briefing.created" { briefingId, agentId, taskId }. Also "contact.handoff" { contactId, fromAgentId, toAgentId, taskId }.
+export type ListBriefingsResponse = ApiEnvelope<{ briefings: Briefing[] }>;
+export type GetBriefingResponse = ApiEnvelope<{ briefing: Briefing }>;
+
+// --- Routine snapshots handed to the agent as task input (routines/run.ts) --------
+export interface AccountReviewEntry {
+  contactId: string;
+  name: string | null;
+  email: string;
+  company: string | null;
+  stage: string;
+  /** Latest email we sent them or message they sent us; null if there is none on record. */
+  lastActivityAt: string | null;
+  /** Whole days since lastActivityAt (since the contact record was last touched when there is none). */
+  daysSinceActivity: number | null;
+  openTasks: { kind: string; status: string; wakeAt: string | null }[];
+  /** Deterministic hint: quiet for more than staleAfterDays and nothing scheduled. The agent verifies before acting. */
+  staleHint: boolean;
+}
+export interface DigestSnapshot {
+  kpis: KpiReport;
+  pendingApprovals: { count: number; oldestAt: string | null; items: { outboxId: string; agentId: string; to: string; subject: string | null; createdAt: string }[] };
+  failedTasks: { count: number; items: { taskId: string; agentId: string; kind: string; title: string; error: string | null; at: string }[] };
+  needsHuman: { count: number; items: { taskId: string; agentId: string; kind: string; title: string; summary: string | null; since: string }[] };
+  newContacts: { count: number; items: { contactId: string; name: string | null; email: string | null; company: string | null; source: string | null; stage: string }[] };
+  handoffs: { count: number; items: { contactId: string; email: string | null; fromAgentId: string | null; toAgentId: string; summary: string; at: string }[] };
+}

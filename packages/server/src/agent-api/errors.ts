@@ -2,7 +2,8 @@
 
 import type { Context } from "hono";
 import { ZodError } from "zod";
-import { NotFoundError, TaskTransitionError } from "@agyhq/db";
+import { ConflictError, NotFoundError, TaskTransitionError } from "@agyhq/db";
+import { ValidationError } from "../util.ts";
 import { err } from "./envelope.ts";
 
 function formatZodError(error: ZodError): string {
@@ -24,8 +25,11 @@ export function handleError(c: Context, error: unknown): Response {
   if (error instanceof NotFoundError) {
     return err(c, "not_found", error.message);
   }
-  if (error instanceof TaskTransitionError) {
+  if (error instanceof TaskTransitionError || error instanceof ConflictError) {
     return err(c, "conflict", error.message);
+  }
+  if (error instanceof ValidationError) {
+    return err(c, "invalid_request", error.message);
   }
   if (error instanceof HttpError) {
     return err(c, error.code, error.message);

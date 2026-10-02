@@ -6,19 +6,13 @@
 import { createHash } from "node:crypto";
 import { nowIso } from "@agyhq/core";
 import type { Db, CreateInboundInput } from "@agyhq/db";
-import type {
-  EmailProvider,
-  InboundClassification,
-  InboundEvent,
-  ParsedEmail,
-  Task,
-  TaskStatus,
-} from "@agyhq/core";
+import type { Contact, EmailProvider, InboundClassification, InboundEvent, ParsedEmail, Task } from "@agyhq/core";
 import { classifyEmail } from "@agyhq/channels";
 import type { AgyhqConfig } from "./config.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { WebhookLeadRequest } from "./admin-types.ts";
 import { effectiveSender } from "./setup/sender-settings.ts";
+import { buildRoster, cancelThreadTasks, isAssignable, roleRouting } from "./routing.ts";
 import { attachmentMeta, attachmentsRoot, eventAttachments, saveAttachments, withAttachmentNote } from "./attachments.ts";
 
 export interface InboundCtx {
@@ -39,20 +33,9 @@ function ourAddresses(config: AgyhqConfig, db: Db): string[] {
   return [...new Set(addrs)];
 }
 
-const CANCELLABLE_STATUSES: TaskStatus[] = ["queued", "waiting_approval", "waiting_external"];
-
 function cancelTasksOnThread(ctx: InboundCtx, threadKey: string | null, kinds?: string[]): void {
-  if (!threadKey) return;
-  const tasks = ctx.db.tasks
-    .list({ status: CANCELLABLE_STATUSES })
-    .filter((t) => t.threadKey === threadKey && (!kinds || kinds.includes(t.kind)));
-  for (const t of tasks) {
-    try {
-      ctx.db.tasks.transition(t.id, "cancelled");
-      ctx.bus.emit("task.transition", { taskId: t.id, to: "cancelled", reason: "inbound routing" });
-    } catch {
-      // already terminal — fine, nothing to cancel.
-    }
+  for (const id of cancelThreadTasks(ctx.db, threadKey, kinds)) {
+    ctx.bus.emit("task.transition", { taskId: id, to: "cancelled", reason: "inbound routing" });
   }
 }
 
@@ -139,56 +122,125 @@ function ignore(ctx: InboundCtx, event: InboundEvent, reason: string): void {
   ctx.bus.emit("inbound.routed", { id: event.id, status: "ignored", reason });
 }
 
-function routeReply(ctx: InboundCtx, event: InboundEvent): void {
-  const contact = event.contactId
-    ? ctx.db.crm.getContact(event.contactId)
-    : event.fromAddress
-      ? (ctx.db.crm.findContacts({ email: event.fromAddress })[0] ?? null)
-      : null;
+/** The contact an inbound event is from, if we know them. */
+function contactFor(ctx: InboundCtx, event: InboundEvent): Contact | null {
+  if (event.contactId) return ctx.db.crm.getContact(event.contactId);
+  return event.fromAddress ? (ctx.db.crm.findContacts({ email: event.fromAddress })[0] ?? null) : null;
+}
 
+/**
+ * Who answers a contact's message: the contact's owner; else (for a customer nobody owns) the default Account
+ * Manager; else the default SDR. Each candidate must exist, not be archived, and have a role that answers replies
+ * (a template `routing.replyKind`) — otherwise null, and the caller falls back to the Chief of Staff.
+ */
+function resolveReplyOwner(
+  ctx: InboundCtx,
+  contact: Contact | null,
+  opts: { sdrFallback?: boolean } = {},
+): { agentId: string; replyKind: string; followUpKinds: string[] } | null {
   const settings = ctx.db.settings.get();
-  const ownerAgentId = contact?.ownerAgentId ?? settings.defaultSdrAgentId;
-  if (!ownerAgentId) {
-    ctx.db.inbound.setStatus(event.id, "received", {
-      statusReason: "no owning or default agent configured for this reply",
-      contactId: contact?.id ?? event.contactId,
-    });
-    return;
+  const candidates = [
+    contact?.ownerAgentId,
+    contact?.stage === "customer" ? settings.defaultAmAgentId : null,
+    opts.sdrFallback === false ? null : settings.defaultSdrAgentId,
+  ];
+  for (const id of candidates) {
+    if (!id) continue;
+    const agent = ctx.db.agents.get(id);
+    if (!isAssignable(agent)) continue;
+    const routing = roleRouting(ctx.config, agent.role);
+    if (routing) return { agentId: agent.id, replyKind: routing.replyKind, followUpKinds: routing.followUpKinds };
   }
+  return null;
+}
 
-  const threadSummary = buildThreadSummary(ctx, event.threadKey, event.id);
-  const task: Task = ctx.db.tasks.create({
-    agentId: ownerAgentId,
-    kind: ctx.config.routing.replyKind,
+function markRouted(ctx: InboundCtx, event: InboundEvent, task: Task, contactId: string | null, action?: string): void {
+  ctx.db.inbound.setStatus(event.id, "routed", { routedTaskId: task.id, contactId });
+  ctx.db.audit.append({
+    kind: "inbound.routed",
+    agentId: task.agentId,
+    taskId: task.id,
+    conversationId: null,
+    data: { id: event.id, taskId: task.id, ...(action ? { action } : {}) },
+  });
+  ctx.bus.emit("inbound.routed", { id: event.id, taskId: task.id, ...(action ? { action } : {}) });
+}
+
+function replyText(ctx: InboundCtx, event: InboundEvent): string {
+  return withAttachmentNote(
+    (event.payload["replyText"] as string | undefined) ?? event.bodyText,
+    attachmentsRoot(ctx.config.dataDir),
+    eventAttachments(event),
+  );
+}
+
+/** A message from a known contact that an owner's role answers: queue that role's reply task and stop its follow-ups. */
+function routeToOwner(
+  ctx: InboundCtx,
+  event: InboundEvent,
+  contact: Contact | null,
+  owner: { agentId: string; replyKind: string; followUpKinds: string[] },
+  threadKey: string | null,
+): void {
+  const task = ctx.db.tasks.create({
+    agentId: owner.agentId,
+    kind: owner.replyKind,
     title: `Reply from ${contact?.name ?? event.fromName ?? event.fromAddress ?? "unknown"}`,
     input: {
       contactName: contact?.name ?? event.fromName ?? null,
       contactEmail: event.fromAddress,
       subject: event.subject,
-      replyBody: withAttachmentNote(
-        (event.payload["replyText"] as string | undefined) ?? event.bodyText,
-        attachmentsRoot(ctx.config.dataDir),
-        eventAttachments(event),
-      ),
-      threadSummary,
+      replyBody: replyText(ctx, event),
+      threadSummary: buildThreadSummary(ctx, threadKey, event.id),
       inboundEventId: event.id,
     },
-    threadKey: event.threadKey ?? undefined,
+    threadKey: threadKey ?? undefined,
     priority: 10,
   });
 
-  cancelTasksOnThread(ctx, event.threadKey, [ctx.config.routing.followUpKind]);
-  if (contact) ctx.db.crm.setStage(contact.id, "replied", "inbound reply received");
+  cancelTasksOnThread(ctx, threadKey, owner.followUpKinds);
+  // A customer who writes in stays a customer; "replied" is a pre-sale stage.
+  if (contact && contact.stage !== "customer") ctx.db.crm.setStage(contact.id, "replied", "inbound reply received");
+  markRouted(ctx, event, task, contact?.id ?? event.contactId);
+}
 
-  ctx.db.inbound.setStatus(event.id, "routed", { routedTaskId: task.id, contactId: contact?.id ?? event.contactId });
-  ctx.db.audit.append({
-    kind: "inbound.routed",
-    agentId: ownerAgentId,
-    taskId: task.id,
-    conversationId: null,
-    data: { id: event.id, taskId: task.id },
+/**
+ * Nothing owns this message: hand it to the default Chief of Staff as a `cos.triage` task carrying the roster of
+ * agents it may delegate to. Returns false when no Chief of Staff is configured (the caller keeps today's behaviour).
+ */
+function routeToChiefOfStaff(ctx: InboundCtx, event: InboundEvent, contact: Contact | null, threadKey: string | null): boolean {
+  const cosId = ctx.db.settings.get().defaultCosAgentId;
+  const cos = cosId ? ctx.db.agents.get(cosId) : null;
+  if (!cos || !isAssignable(cos)) return false;
+  const task = ctx.db.tasks.create({
+    agentId: cos.id,
+    kind: "cos.triage",
+    title: `Triage: ${truncate(event.subject ?? event.fromAddress ?? "inbound message", 80)}`,
+    input: {
+      inboundEventId: event.id,
+      fromAddress: event.fromAddress,
+      fromName: contact?.name ?? event.fromName ?? null,
+      subject: event.subject,
+      body: truncate(replyText(ctx, event), 6000),
+      classification: event.classification,
+      roster: buildRoster(ctx.config, ctx.db),
+    },
+    threadKey: threadKey ?? undefined,
+    priority: event.classification === "reply" ? 10 : 5,
   });
-  ctx.bus.emit("inbound.routed", { id: event.id, taskId: task.id });
+  markRouted(ctx, event, task, contact?.id ?? event.contactId, "triage");
+  return true;
+}
+
+function routeReply(ctx: InboundCtx, event: InboundEvent): void {
+  const contact = contactFor(ctx, event);
+  const owner = resolveReplyOwner(ctx, contact);
+  if (owner) return routeToOwner(ctx, event, contact, owner, event.threadKey);
+  if (routeToChiefOfStaff(ctx, event, contact, event.threadKey)) return;
+  ctx.db.inbound.setStatus(event.id, "received", {
+    statusReason: "no owning or default agent configured for this reply",
+    contactId: contact?.id ?? event.contactId,
+  });
 }
 
 function routeNewLead(ctx: InboundCtx, event: InboundEvent): void {
@@ -209,9 +261,17 @@ function routeNewLead(ctx: InboundCtx, event: InboundEvent): void {
     source: webhookSource ? `inbound-webhook:${webhookSource}` : "inbound-email",
   });
 
+  // An existing customer writing from "nowhere" (no thread we can match) is not a lead: it goes to their owner.
+  if (contact.stage === "customer") {
+    const owner = resolveReplyOwner(ctx, contact, { sdrFallback: false });
+    if (owner) return routeToOwner(ctx, event, contact, owner, event.threadKey ?? `contact:${email}`);
+  }
+
   const settings = ctx.db.settings.get();
   const agentId = settings.defaultSdrAgentId;
-  if (!agentId) {
+  const sdr = agentId ? ctx.db.agents.get(agentId) : null;
+  if (!agentId || !isAssignable(sdr)) {
+    if (routeToChiefOfStaff(ctx, event, contact, event.threadKey ?? `contact:${email}`)) return;
     ctx.db.inbound.setStatus(event.id, "received", { statusReason: "no default SDR agent configured", contactId: contact.id });
     return;
   }
@@ -236,19 +296,11 @@ function routeNewLead(ctx: InboundCtx, event: InboundEvent): void {
     threadKey: `contact:${email}`,
     priority: 5,
   });
-
-  ctx.db.inbound.setStatus(event.id, "routed", { routedTaskId: task.id, contactId: contact.id });
-  ctx.db.audit.append({
-    kind: "inbound.routed",
-    agentId,
-    taskId: task.id,
-    conversationId: null,
-    data: { id: event.id, taskId: task.id },
-  });
-  ctx.bus.emit("inbound.routed", { id: event.id, taskId: task.id });
+  markRouted(ctx, event, task, contact.id);
 }
 
-function routeInboundEvent(ctx: InboundCtx, event: InboundEvent): void {
+/** Deterministically route one stored inbound event (exported for tests and for re-routing a parked event). */
+export function routeInboundEvent(ctx: InboundCtx, event: InboundEvent): void {
   switch (event.classification) {
     case "unsubscribe":
       return routeUnsubscribe(ctx, event);
@@ -262,8 +314,13 @@ function routeInboundEvent(ctx: InboundCtx, event: InboundEvent): void {
       return routeReply(ctx, event);
     case "new_lead":
       return routeNewLead(ctx, event);
-    default:
+    default: {
+      // "other": nothing deterministic owns it — the Chief of Staff, if there is one, decides.
+      const contact = contactFor(ctx, event);
+      const threadKey = event.threadKey ?? (event.fromAddress ? `contact:${event.fromAddress.toLowerCase()}` : null);
+      if (routeToChiefOfStaff(ctx, event, contact, threadKey)) return;
       return ignore(ctx, event, "unclassified");
+    }
   }
 }
 

@@ -123,7 +123,7 @@ export interface AgentScorecard {
 // ---------------------------------------------------------------------------
 // Routines — recurring work per agent
 
-export type RoutineKind = "prospecting" | "pipeline_review" | "custom_task";
+export type RoutineKind = "prospecting" | "pipeline_review" | "account_review" | "daily_digest" | "custom_task";
 
 export interface Routine {
   id: string;
@@ -135,7 +135,9 @@ export interface Routine {
   timezone: string;
   /**
    * prospecting: { batchSize, stages: LeadStage[] }  — research the next N uncontacted leads
-   * pipeline_review: {}                              — daily summary task
+   * pipeline_review: { maxContacts, staleAfterDays } — SDR: daily summary task
+   * account_review: { maxAccounts, staleAfterDays }  — AM: review `customer` contacts, flag at-risk accounts
+   * daily_digest: { lookbackHours }                  — CoS: owner's daily brief (stored as a Briefing)
    * custom_task: { kind, title, input }              — create this task each time
    */
   config: Record<string, unknown>;

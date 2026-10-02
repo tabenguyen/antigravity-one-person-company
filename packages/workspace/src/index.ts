@@ -2,11 +2,12 @@ export type {
   Template,
   TemplateJson,
   TaskKindSpec,
+  TemplateRouting,
   RenderVars,
   RenderWorkspaceArgs,
   RenderWorkspaceResult,
 } from "./types.ts";
-export { TemplateJsonZ, TaskKindSpecZ, ToolPolicyZ, McpToolRefZ } from "./types.ts";
+export { TemplateJsonZ, TemplateRoutingZ, TaskKindSpecZ, ToolPolicyZ, McpToolRefZ } from "./types.ts";
 
 export { loadTemplate, listTemplateRoles } from "./template-loader.ts";
 export { renderWorkspace, renderPrompt } from "./render.ts";

@@ -1,0 +1,86 @@
+{
+  "id": "message-vietnamese-how-to",
+  "description": "Customer writes in Vietnamese asking how to connect TikTok Shop. The KB answers it. Expected: a Vietnamese draft with the real steps, no price, no English boilerplate, no AI/bot wording.",
+  "kind": "am.handle_message",
+  "contact": {
+    "email": "thu.ha@lamdep-eval.example",
+    "name": "Thu Hà",
+    "title": "Chủ shop",
+    "language": "vi",
+    "companyName": "Lam Dep Cosmetics",
+    "companyDomain": "lamdep-eval.example",
+    "companyIndustry": "Mỹ phẩm bán online",
+    "companySize": "12 nhân viên",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Chào mừng chị đến với StockSync",
+        "body": "Chào chị Hà,\n\nEm là Linh, em sẽ là đầu mối hỗ trợ chị tại StockSync từ nay. Chị cứ nhắn em khi cần nhé.\n\nLinh, StockSync"
+      }
+    ],
+    "inbound": [
+      {
+        "subject": "Re: Chào mừng chị đến với StockSync",
+        "body": "Chào Linh, shop mình vừa mở thêm gian hàng TikTok Shop. Mình kết nối kênh này vào StockSync như thế nào vậy bạn? Có phải nhờ bên kỹ thuật không? Cảm ơn bạn."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 1
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\b(dear|best regards|kind regards|thank you for your)\\b"
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "TikTok"
+    },
+    {
+      "type": "draft.contains",
+      "anyOf": [
+        "Add channel",
+        "Thêm kênh",
+        "Channels",
+        "Kênh"
+      ]
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|artificial intelligence|as an ai"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\[[^\\]]{2,}\\]|\\{\\{|\\bTODO\\b|lorem ipsum|\\bXXX\\b"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    }
+  ]
+}

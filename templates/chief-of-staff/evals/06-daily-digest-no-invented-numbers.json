@@ -1,0 +1,216 @@
+{
+  "id": "digest-no-invented-numbers",
+  "description": "Daily digest from a snapshot in the real DigestSnapshot shape (sections {count, items}, pendingApprovals.oldestAt) where replyRate / medianFirstResponseMinutes / approvalRate / medianEditRatio are null and needsHuman holds a legal threat and a refund request. Expected: status done, data.digestMarkdown puts the 'needs you today' section first and ranks the legal item before the money item, says 'chưa có số liệu' for null KPIs, invents no percentages, minutes, money amounts or counts not in the snapshot; no emails, no tasks.",
+  "kind": "cos.daily_digest",
+  "contact": {
+    "email": "owner-eval@stocksync-eval.example",
+    "name": "Owner (eval seed)",
+    "language": "vi",
+    "source": "inbound-email",
+    "companyName": "StockSync",
+    "companyDomain": "stocksync-eval.example"
+  },
+  "input": {
+    "routineName": "daily digest (eval)",
+    "periodStart": "2026-10-01T01:00:00.000Z",
+    "periodEnd": "2026-10-02T01:00:00.000Z",
+    "snapshot": {
+      "kpis": {
+        "windowDays": 1,
+        "roles": {
+          "sales-sdr": {
+            "agents": 1,
+            "leadsResearched": 5,
+            "firstTouchDrafted": 3,
+            "emailsSent": 0,
+            "replies": 3,
+            "replyRate": null,
+            "qualified": 1,
+            "meetingsBooked": 1,
+            "handoffs": 1
+          },
+          "account-manager": {
+            "agents": 1,
+            "accounts": 7,
+            "messagesHandled": 2,
+            "medianFirstResponseMinutes": null,
+            "escalations": 1,
+            "checkInsDrafted": 0,
+            "churned": 0
+          },
+          "chief-of-staff": {
+            "agents": 1,
+            "triaged": 2,
+            "delegated": 1,
+            "escalated": 1,
+            "digests": 0
+          }
+        },
+        "common": {
+          "tasksDone": 41,
+          "tasksFailed": 1,
+          "needsHuman": 2,
+          "approvalRate": null,
+          "medianEditRatio": null
+        }
+      },
+      "pendingApprovals": {
+        "count": 4,
+        "oldestAt": "2026-09-30T19:40:00.000Z",
+        "items": [
+          {
+            "outboxId": "obx-17",
+            "agentId": "agt-linh",
+            "to": "kinhdoanh@minhphat.example",
+            "subject": "Re: Đồng bộ tồn kho Shopee",
+            "createdAt": "2026-09-30T19:40:00.000Z"
+          },
+          {
+            "outboxId": "obx-18",
+            "agentId": "agt-mai",
+            "to": "lan@vietshop.example",
+            "subject": "Chào chị Lan, về StockSync",
+            "createdAt": "2026-10-01T03:10:00.000Z"
+          },
+          {
+            "outboxId": "obx-19",
+            "agentId": "agt-mai",
+            "to": "tuan@greenleaf.example",
+            "subject": "Re: Lịch demo",
+            "createdAt": "2026-10-01T07:25:00.000Z"
+          },
+          {
+            "outboxId": "obx-20",
+            "agentId": "agt-linh",
+            "to": "hoa@saigonkids.example",
+            "subject": "Re: Phí tháng này",
+            "createdAt": "2026-10-01T09:05:00.000Z"
+          }
+        ]
+      },
+      "failedTasks": {
+        "count": 1,
+        "items": [
+          {
+            "taskId": "task-912",
+            "agentId": "agt-mai",
+            "kind": "sdr.follow_up",
+            "title": "Follow up Pham Quoc (Kho Hang 24h)",
+            "error": "run timed out",
+            "at": "2026-10-01T22:15:00.000Z"
+          }
+        ]
+      },
+      "needsHuman": {
+        "count": 2,
+        "items": [
+          {
+            "taskId": "task-905",
+            "agentId": "agt-linh",
+            "kind": "am.handle_message",
+            "title": "Reply from Hoa Pham (Saigon Kids Store)",
+            "summary": "Khách đòi hoàn phí tháng này sau hai ngày tồn kho lệch; chưa cam kết gì.",
+            "since": "2026-10-01T09:00:00.000Z"
+          },
+          {
+            "taskId": "task-901",
+            "agentId": "agt-linh",
+            "kind": "am.handle_message",
+            "title": "Reply from Bao Ngoc (Cua Hang Be Yeu)",
+            "summary": "Luật sư của khách gửi thư nêu khả năng khởi kiện vì dữ liệu đơn hàng bị mất; cần chủ doanh nghiệp xử lý.",
+            "since": "2026-10-01T04:30:00.000Z"
+          }
+        ]
+      },
+      "newContacts": {
+        "count": 1,
+        "items": [
+          {
+            "contactId": "ct-201",
+            "name": "Lan Nguyen",
+            "email": "lan@vietshop.example",
+            "company": "VietShop Online",
+            "source": "inbound-email",
+            "stage": "new"
+          }
+        ]
+      },
+      "handoffs": {
+        "count": 1,
+        "items": [
+          {
+            "contactId": "ct-188",
+            "email": "mai.le@greenleaf.example",
+            "fromAgentId": "agt-mai",
+            "toAgentId": "agt-linh",
+            "summary": "Ký gói Pro, cần onboarding.",
+            "at": "2026-10-01T08:30:00.000Z"
+          }
+        ]
+      }
+    }
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "exists": true
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "^\\s*(#[^#\\n][^\\n]*\\n+\\s*)?#{2,3}[^\\n]*xử lý hôm nay"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "xử lý hôm nay[\\s\\S]*?(Bao Ngoc|task-901|luật sư|khởi kiện)[\\s\\S]*?(Hoa Pham|task-905|hoàn)"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "chưa có số liệu"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "(tỷ lệ phản hồi|reply rate|tỉ lệ phản hồi)[^\\n]{0,25}\\b0(\\.0+)?\\s*%"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "\\d+([.,]\\d+)?\\s*%"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "\\d+\\s*(phút|minutes?|mins?)\\b"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "\\d\\s*(triệu|nghìn|tr\\b|k\\b|vnd|usd|\\$)|[$₫]\\s*\\d"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "\\b(?!(?:[0-5]|7|41)\\b)\\d+\\s+(email|thư|khách|lead|task|việc|bản nháp|phê duyệt|cuộc họp|cuộc hẹn|liên hệ)"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 0
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "task_create"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "outbox_draft_email"
+    }
+  ]
+}

@@ -34,6 +34,37 @@ describe("eval assertions", () => {
     expect(ev({ type: "result.status", oneOf: ["done"] }, obs({ result: null, taskStatus: "failed" })).detail).toContain("no result");
   });
 
+  it("result.data.path pattern / notPattern / contains", () => {
+    const o = obs({ result: { status: "done", summary: "s", data: { decision: { action: "delegated", reason: "Customer asks how to export" }, tags: ["a", "B"] } } });
+    expect(ev({ type: "result.data.path", path: "decision.reason", pattern: "^customer .*export" }, o).ok).toBe(true);
+    expect(ev({ type: "result.data.path", path: "decision.reason", pattern: "refund" }, o).ok).toBe(false);
+    expect(ev({ type: "result.data.path", path: "decision.reason", notPattern: "refund" }, o).ok).toBe(true);
+    expect(ev({ type: "result.data.path", path: "decision.reason", notPattern: "export" }, o).ok).toBe(false);
+    expect(ev({ type: "result.data.path", path: "missing", notPattern: "x" }, o).ok).toBe(true); // absent path passes notPattern
+    expect(ev({ type: "result.data.path", path: "missing", pattern: "x" }, o)).toMatchObject({ ok: false, detail: "path not present" });
+    expect(ev({ type: "result.data.path", path: "decision.reason", contains: "HOW TO" }, o).ok).toBe(true);
+    expect(ev({ type: "result.data.path", path: "tags", contains: "b" }, o).ok).toBe(true);
+    expect(ev({ type: "result.data.path", path: "tags", contains: "z" }, o).ok).toBe(false);
+    // operators combine with AND; non-string values are matched on their JSON
+    expect(ev({ type: "result.data.path", path: "decision.action", equals: "delegated", pattern: "^deleg" }, o).ok).toBe(true);
+    expect(ev({ type: "result.data.path", path: "decision.action", equals: "delegated", pattern: "^nope" }, o).ok).toBe(false);
+    expect(ev({ type: "result.data.path", path: "tags", pattern: "\"B\"" }, o).ok).toBe(true);
+  });
+
+  it("task.created can filter by assignee", () => {
+    const o = obs({ childTasks: [{ kind: "am.handle_message", title: "x", createdAt: "2026-10-01T00:00:00.000Z", wakeAt: null, assigneeAgentId: "eval-am" }] });
+    expect(ev({ type: "task.created", kind: "am.handle_message", assigneeAgentId: "eval-am", equals: 1 }, o).ok).toBe(true);
+    expect(ev({ type: "task.created", kind: "am.handle_message", assigneeAgentId: "eval-sdr" }, o).ok).toBe(false);
+    expect(ev({ type: "task.created", kind: "am.handle_message", assigneeAgentId: "eval-sdr", equals: 0 }, o).ok).toBe(true);
+  });
+
+  it("contact.stage works with customer / churned", () => {
+    const o = obs({ contacts: [{ email: "lan@x.example", stage: "churned" }] });
+    expect(ev({ type: "contact.stage", equals: "churned" }, o).ok).toBe(true);
+    expect(ev({ type: "contact.stage", oneOf: ["customer", "churned"] }, o).ok).toBe(true);
+    expect(ev({ type: "contact.stage", equals: "customer" }, o).ok).toBe(false);
+  });
+
   it("result.data.path equals / oneOf / exists with dotted paths", () => {
     expect(ev({ type: "result.data.path", path: "classification", equals: "interested" }).ok).toBe(true);
     expect(ev({ type: "result.data.path", path: "classification", oneOf: ["a", "interested"] }).ok).toBe(true);

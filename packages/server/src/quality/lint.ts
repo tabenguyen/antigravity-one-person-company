@@ -7,6 +7,7 @@
 // and draft again); `warn`/`info` are shown to the human reviewer only.
 
 import type { LintFinding } from "@agyhq/core";
+import { lintAccountManagerPromises } from "./am-lint.ts";
 
 export interface LintDraft {
   subject: string | null | undefined;
@@ -439,6 +440,9 @@ export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[
       }
     }
   }
+
+  // account-manager promises (refunds, discounts, credits, SLA, delivery dates, contract changes) -------
+  if (ctx.role === "account-manager") findings.push(...lintAccountManagerPromises(all));
 
   return findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }

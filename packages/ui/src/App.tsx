@@ -15,6 +15,7 @@ import { MemoryPage } from "./pages/Memory/MemoryPage.tsx";
 import { SettingsPage } from "./pages/Settings/SettingsPage.tsx";
 import { SetupPage } from "./pages/Setup/SetupPage.tsx";
 import { ScorecardsPage } from "./pages/Scorecards/ScorecardsPage.tsx";
+import { BriefingsPage } from "./pages/Briefings/BriefingsPage.tsx";
 import { RoutinesPage } from "./pages/Routines/RoutinesPage.tsx";
 
 export function App() {
@@ -34,6 +35,8 @@ export function App() {
         <Route index element={<Navigate to="/inbox" replace />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/briefings" element={<BriefingsPage />} />
+        <Route path="/briefings/:id" element={<BriefingsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
         <Route path="/agents" element={<AgentsPage />} />

@@ -11,6 +11,7 @@ import { useToast } from "./Toast.tsx";
 const NAV_ITEMS = [
   { to: "/inbox", label: "Inbox", badge: "pending" as const },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/briefings", label: "Briefings" },
   { to: "/tasks", label: "Tasks" },
   { to: "/agents", label: "Agents" },
   { to: "/contacts", label: "Contacts" },

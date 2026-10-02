@@ -187,3 +187,84 @@
   align-self: center;
   font-size: 12px;
 }
+
+/* Contact handoff */
+.handoff-item {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-success);
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+}
+.handoff-item p {
+  margin: var(--space-1) 0 0;
+}
+.handoff-blocker {
+  margin-top: 0;
+}
+
+/* Dashboard KPIs */
+.kpi-section {
+  margin-bottom: var(--space-5);
+}
+.kpi-header {
+  margin-bottom: var(--space-2);
+}
+.kpi-window {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+.kpi-group h3 {
+  margin: var(--space-3) 0 var(--space-2);
+}
+.kpi-agents {
+  font-size: 12px;
+  font-weight: 400;
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.kpi-card {
+  padding: var(--space-3);
+}
+.kpi-hint {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* Task detail: structured result insights */
+.task-insights {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: 13px;
+}
+.kv dt {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.claims {
+  margin: 0;
+  padding-left: 18px;
+}
+@media (max-width: 600px) {
+  .kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .kv dd {
+    margin-bottom: var(--space-2);
+  }
+}

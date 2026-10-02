@@ -2,18 +2,24 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../api/client.ts";
 import { useApi } from "../../hooks/useApi.ts";
+import { StageBadge } from "../../components/StageBadge.tsx";
+import { STAGES, stageLabel } from "../../lib/roles.ts";
 import { AddContactForm } from "./AddContactForm.tsx";
 import { ImportCsvForm } from "./ImportCsvForm.tsx";
 
 export function ContactsPage() {
   const [query, setQuery] = useState("");
+  const [stage, setStage] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const { data, loading, error, refresh } = useApi(
-    () => api.listContacts({ query: query || undefined, limit: 50 }),
+    () => api.listContacts({ query: query || undefined, limit: 200 }),
     [query],
-    ["contact.upserted", "contact.imported"],
+    ["contact.upserted", "contact.imported", "contact.handoff"],
   );
+  const { data: agentsData } = useApi(() => api.listAgents(), [], ["agent.created", "agent.updated"]);
+  const agentName = new Map((agentsData?.agents ?? []).map((a) => [a.id, a.displayName]));
+  const contacts = (data?.contacts ?? []).filter((c) => !stage || c.stage === stage);
 
   return (
     <div>
@@ -38,6 +44,14 @@ export function ContactsPage() {
           style={{ width: 320 }}
           aria-label="Search contacts"
         />
+        <select value={stage} onChange={(e) => setStage(e.target.value)} aria-label="Filter by stage">
+          <option value="">All stages</option>
+          {STAGES.map((s) => (
+            <option key={s} value={s}>
+              {stageLabel(s)}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <p className="form-error">{error}</p>}
@@ -53,7 +67,7 @@ export function ContactsPage() {
           </tr>
         </thead>
         <tbody>
-          {data?.contacts.map((c) => (
+          {contacts.map((c) => (
             <tr key={c.id}>
               <td>
                 <Link to={`/contacts/${c.id}`}>{c.name ?? "(no name)"}</Link>
@@ -61,12 +75,12 @@ export function ContactsPage() {
               <td>{c.email}</td>
               <td>{c.company?.name ?? "—"}</td>
               <td>
-                <span className="chip">{c.stage}</span>
+                <StageBadge stage={c.stage} />
               </td>
-              <td>{c.ownerAgentId ?? "—"}</td>
+              <td>{c.ownerAgentId ? (agentName.get(c.ownerAgentId) ?? c.ownerAgentId) : "—"}</td>
             </tr>
           ))}
-          {!loading && data?.contacts.length === 0 && (
+          {!loading && data && contacts.length === 0 && (
             <tr>
               <td colSpan={5} className="empty-state">
                 No contacts found.

@@ -23,10 +23,14 @@ describe("loadTemplate", () => {
     expect(t.resultSchema).toMatchObject({ type: "object" });
   });
 
-  it("loads the account-manager stub template", () => {
+  it("loads the account-manager template", () => {
     const t = loadTemplate(templatesRoot, "account-manager");
     expect(t.role).toBe("account-manager");
     expect(t.taskKinds.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("exposes template routing (sales-sdr declares its reply and follow-up kinds)", () => {
+    expect(loadTemplate(templatesRoot, "sales-sdr").routing).toEqual({ replyKind: "sdr.handle_reply", followUpKinds: ["sdr.follow_up"] });
   });
 
   it("discovers all templates with listTemplateRoles", () => {
@@ -50,6 +54,25 @@ describe("loadTemplate validation failures", () => {
 
   afterEach(() => {
     fs.rmSync(scratchRoot, { recursive: true, force: true });
+  });
+
+  it("parses an optional routing block and defaults followUpKinds", () => {
+    const jsonPath = path.join(scratchRoot, "sales-sdr/template.json");
+    const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+    data.routing = { replyKind: "sdr.handle_reply" };
+    fs.writeFileSync(jsonPath, JSON.stringify(data));
+    expect(loadTemplate(scratchRoot, "sales-sdr").routing).toEqual({ replyKind: "sdr.handle_reply", followUpKinds: [] });
+    delete data.routing;
+    fs.writeFileSync(jsonPath, JSON.stringify(data));
+    expect(loadTemplate(scratchRoot, "sales-sdr").routing).toBeNull();
+  });
+
+  it("rejects routing that names a task kind the template does not define", () => {
+    const jsonPath = path.join(scratchRoot, "sales-sdr/template.json");
+    const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+    data.routing = { replyKind: "sdr.handle_reply", followUpKinds: ["sdr.nope"] };
+    fs.writeFileSync(jsonPath, JSON.stringify(data));
+    expect(() => loadTemplate(scratchRoot, "sales-sdr")).toThrow(/routing.*sdr\.nope/);
   });
 
   it("rejects a template.json whose role does not match the directory name", () => {

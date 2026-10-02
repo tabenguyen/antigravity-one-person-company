@@ -9,6 +9,7 @@ import { registerSetupWizardRoutes, withSetupDefaults } from "./admin-setup-wiza
 import { registerQualityRoutes } from "./admin-quality.ts";
 import { lintOutboxItem } from "./quality/index.ts";
 import { registerRoutinesRoutes } from "./admin-routines.ts";
+import { registerCoordinationRoutes } from "./admin-coordination.ts";
 import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -184,6 +185,7 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
   registerReadinessRoutes(app, deps);
   registerQualityRoutes(app, deps);
   registerRoutinesRoutes(app, deps);
+  registerCoordinationRoutes(app, deps);
 
   // -- Agents --------------------------------------------------------------
 
@@ -532,6 +534,15 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
     return guarded(c, () => {
       if (body.defaultSdrAgentId && !deps.db.agents.get(body.defaultSdrAgentId)) {
         throw new ValidationError(`agent not found: ${body.defaultSdrAgentId}`);
+      }
+      // The Account Manager / Chief of Staff defaults must be an active agent of that role (or null to clear).
+      for (const [key, role] of [["defaultAmAgentId", "account-manager"], ["defaultCosAgentId", "chief-of-staff"]] as const) {
+        const id = body[key];
+        if (!id) continue;
+        const agent = deps.db.agents.get(id);
+        if (!agent) throw new ValidationError(`agent not found: ${id}`);
+        if (agent.role !== role) throw new ValidationError(`${key} must be a ${role} agent; "${id}" is a ${agent.role}`);
+        if (agent.status !== "active") throw new ValidationError(`${key} must be an active agent; "${id}" is ${agent.status}`);
       }
       const settings = deps.db.settings.patch(body);
       deps.db.audit.append({ kind: "settings.changed", agentId: null, taskId: null, conversationId: null, data: body });

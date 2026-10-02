@@ -13,7 +13,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import type { AgentRole, EvalCaseResult, Iso, TaskResult } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
-import { loadTemplate } from "@agyhq/workspace";
+import { listTemplateRoles, loadTemplate } from "@agyhq/workspace";
 import type { AgyhqConfig } from "../config.ts";
 import { createAgent } from "../provision.ts";
 import { ValidationError } from "../util.ts";
@@ -102,16 +102,23 @@ export async function runEvalCases(opts: EvalRunnerOptions): Promise<EvalRunnerR
   return { model, results: slots as EvalCaseResult[] };
 }
 
-/** A private copy of just the suite's role template, minus evals/ and its (placeholder) role KB. */
-function prepareTemplatesRoot(srcRoot: string, role: string, destRoot: string): string {
-  const dest = path.join(destRoot, role);
-  fs.cpSync(path.join(srcRoot, role), dest, {
-    recursive: true,
-    filter: (src) => {
-      const rel = path.relative(path.join(srcRoot, role), src);
-      return !(rel === "evals" || rel.startsWith(`evals${path.sep}`) || rel === "kb" || rel.startsWith(`kb${path.sep}`));
-    },
-  });
+/**
+ * A private copy of the role templates (the suite's role, plus the other roles so a case can provision teammates, plus
+ * `_shared`), minus evals/ and the placeholder role KB — the suite's own evals/kb is the only KB in an eval daemon.
+ */
+function prepareTemplatesRoot(srcRoot: string, _role: string, destRoot: string): string {
+  const roles = listTemplateRoles(srcRoot);
+  for (const name of [...roles, "_shared"]) {
+    const src = path.join(srcRoot, name);
+    if (!fs.existsSync(src)) continue;
+    fs.cpSync(src, path.join(destRoot, name), {
+      recursive: true,
+      filter: (file) => {
+        const rel = path.relative(src, file);
+        return !(rel === "evals" || rel.startsWith(`evals${path.sep}`) || rel === "kb" || rel.startsWith(`kb${path.sep}`));
+      },
+    });
+  }
   return destRoot;
 }
 
@@ -165,12 +172,17 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
       { id: EVAL_AGENT_ID, role: loaded.name as AgentRole, displayName: loaded.config.displayName, model: ctx.model, trustTier: "shadow", maxConcurrency: 1 },
     );
 
-    const seeded = seedCase(db, agent.id, c);
+    // Teammates the case refers to (e.g. a Chief of Staff's roster) exist so task_create can assign to them, but with
+    // zero concurrency they can never claim a task: only the case's own agent costs model runs.
+    const teammates = provisionTeammates({ config: daemon.config, db }, c, agent.id);
+    const owner = c.contact.ownerAgentId ?? (loaded.name === "chief-of-staff" ? null : agent.id);
+    if (owner && !db.agents.get(owner)) throw new Error(`case ${c.id}: contact.ownerAgentId "${owner}" is not the eval agent or a provisioned teammate (${teammates.join(", ") || "none"})`);
+    const seeded = seedCase(db, agent.id, c, { ownerAgentId: owner });
     const task = db.tasks.create({
       agentId: agent.id,
       kind: c.kind,
       title: `eval ${c.id}`,
-      input: buildTaskInput(c),
+      input: { contactId: seeded.contactId, ...buildTaskInput(c) },
       threadKey: `contact:${seeded.email}`,
       priority: 10,
       maxAttempts: 1,
@@ -248,7 +260,33 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
 // ---------------------------------------------------------------------------
 // Seeding
 
-export function seedCase(db: Db, agentId: string, c: EvalCase): { email: string; contactId: string } {
+/** Ids the case needs besides the eval agent: `agents` plus the `input.roster` entries. */
+export function teammateSpecs(c: EvalCase): { id: string; role: AgentRole; displayName: string }[] {
+  const specs = new Map<string, { id: string; role: AgentRole; displayName: string }>();
+  for (const a of c.agents) specs.set(a.id, { id: a.id, role: a.role, displayName: a.displayName ?? a.id });
+  const roster = c.input["roster"];
+  if (Array.isArray(roster)) {
+    for (const r of roster) {
+      const e = r as { agentId?: unknown; role?: unknown; displayName?: unknown };
+      if (typeof e?.agentId === "string" && typeof e.role === "string" && !specs.has(e.agentId)) {
+        specs.set(e.agentId, { id: e.agentId, role: e.role as AgentRole, displayName: typeof e.displayName === "string" ? e.displayName : e.agentId });
+      }
+    }
+  }
+  specs.delete(EVAL_AGENT_ID);
+  return [...specs.values()];
+}
+
+function provisionTeammates(ctx: { config: AgyhqConfig; db: Db }, c: EvalCase, _evalAgentId: string): string[] {
+  const ids: string[] = [];
+  for (const spec of teammateSpecs(c)) {
+    createAgent(ctx, { id: spec.id, role: spec.role, displayName: spec.displayName, trustTier: "shadow", maxConcurrency: 0 });
+    ids.push(spec.id);
+  }
+  return ids;
+}
+
+export function seedCase(db: Db, agentId: string, c: EvalCase, opts: { ownerAgentId?: string | null } = {}): { email: string; contactId: string } {
   const ct = c.contact;
   const email = ct.email.toLowerCase();
   if (ct.companyName || ct.companyDomain) {
@@ -266,7 +304,7 @@ export function seedCase(db: Db, agentId: string, c: EvalCase): { email: string;
     title: ct.title,
     language: ct.language,
     source: ct.source ?? "eval-seed",
-    ownerAgentId: agentId,
+    ownerAgentId: opts.ownerAgentId === undefined ? agentId : opts.ownerAgentId,
     companyName: ct.companyName,
     companyDomain: ct.companyDomain,
     attributes: ct.attributes,
@@ -336,10 +374,10 @@ function observe(db: Db, agentId: string, taskId: string, contactEmail: string, 
     .reverse()
     .map((e) => String(e.data["mcpTool"] ?? e.data["toolName"] ?? "unknown"));
   const childTasks = db.tasks
-    .list({ agentId })
+    .list({})
     .filter((t) => t.parentTaskId === taskId)
     .reverse()
-    .map((t) => ({ kind: t.kind, title: t.title, createdAt: t.createdAt as Iso, wakeAt: t.wakeAt }));
+    .map((t) => ({ kind: t.kind, title: t.title, createdAt: t.createdAt as Iso, wakeAt: t.wakeAt, assigneeAgentId: t.agentId }));
   const lintBlocked = db.audit
     .list({ taskId, kind: ["outbox.lint_blocked"] })
     .reverse()

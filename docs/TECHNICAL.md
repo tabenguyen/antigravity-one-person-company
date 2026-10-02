@@ -217,6 +217,38 @@ edit without touching agent-instance state.
   `agy-ui` (if present at `config.uiDist`) is served at `/`, SPA-fallback
   style, and never shadows `/v1/*`.
 
+## Phase 4 scope (roles + coordination)
+
+Contract and definitions: [`docs/PHASE4.md`](PHASE4.md). Summary of what the daemon does:
+
+- **Roles**: `sales-sdr`, `account-manager`, `chief-of-staff` all provision from
+  `templates/<role>/`. A template's optional `routing { replyKind, followUpKinds }`
+  tells the inbound router which task kind answers a reply for that role.
+- **Inbound routing** (`inbound.ts`, `routing.ts`): a reply goes to the contact's
+  owner using the *owner's role* reply kind; a `customer` is never downgraded to
+  `replied`; a `new_lead` from a known customer is a reply to its owner; `other`
+  and unroutable mail go to the default Chief of Staff as `cos.triage` (with a
+  roster of active agents and their task kinds) when `defaultCosAgentId` is set.
+- **Handoff** (`handoff.ts`): MCP tool `contact_handoff({contactId, toRole, summary})`
+  and `POST /v1/admin/contacts/:id/handoff {toRole?, summary?}` move a won contact
+  to `settings.defaultAmAgentId` in one transaction (owner, stage `customer`, note,
+  cancel the previous owner's follow-ups on the thread, `am.onboard` task, audit
+  `contact.handoff`).
+- **Routines**: `account_review` (AM) and `daily_digest` (CoS) join `prospecting`,
+  `pipeline_review`, `custom_task` (`hq routine create --kind ...`). A finished
+  `cos.daily_digest` with `data.digestMarkdown` is stored as a Briefing.
+- **Admin API**: `GET /v1/admin/kpis?days=N` (per-role KPIs, nulls where there is no
+  data), `GET /v1/admin/briefings[?limit=&agentId=]`, `GET /v1/admin/briefings/:id`,
+  `POST /v1/admin/contacts/:id/handoff`, and `PATCH /v1/admin/settings` now takes
+  `defaultAmAgentId` / `defaultCosAgentId`. Types: "Phase 4 additions" in
+  `packages/server/src/admin-types.ts`. SSE adds `contact.handoff`, `briefing.created`.
+- **Quality**: AM drafts are linted for promises (refund, discount, credit, SLA, delivery
+  dates, contract changes; vi + en). Eval suites exist per role
+  (`templates/<role>/evals/`, `hq eval run --suite <role>`).
+- **UI** (`packages/ui`): role picker in New agent; default AM / CoS in Settings; contact page with owner, stage badge, "Hand off to Account Manager" and handoff history (`contact.handoff` audit rows, notes as fallback); Briefings page (`/briefings`); per-role KPI cards on the Dashboard (7/30 days, `—` for null rates); `account_review` / `daily_digest` in the routine form; structured `cos.triage` decision / `am.*` notes on the task page.
+- **CLI**: `hq kpis [--days n]`, `hq briefings [list|show <id>]`,
+  `hq contact handoff <id> [--summary ...]`, `hq routine create --kind account_review|daily_digest`.
+
 ## Setup wizard (backend)
 
 The Setup page lets a non-technical owner go from "a domain" to a live SDR without editing config files or restarting
@@ -272,7 +304,7 @@ Opt-in real run (uses a temp data dir, costs quota):
 | `@agyhq/runner` | Spawns `agy` headlessly and classifies the outcome |
 | `@agyhq/workspace` | Renders a role template into a per-agent workspace; renders per-task prompts |
 | `@agyhq/hooks` | The `PreToolUse`/`PostToolUse`/`PreInvocation`/`PostInvocation`/`Stop` scripts `agy` invokes |
-| `@agyhq/mcp` | The company MCP server (`kb_*`, `crm_*`, `memory_*`, `task_create`, `outbox_draft_email`) |
+| `@agyhq/mcp` | The company MCP server (`kb_*`, `crm_*`, `memory_*`, `task_create`, `contact_handoff`, `outbox_draft_email`) |
 | `@agyhq/server` | The daemon: config, provisioning, KB ingestion, orchestrator, quota, inbound pipeline, sender, admin API, agent-facing API |
 | `@agyhq/channels` | Email providers (`imap-smtp`, `maildir`, `fake`) + parsing/classification, behind `@agyhq/core`'s `EmailProvider` contract |
 | `@agyhq/cli` | `hq` — the command-line client for the admin API |

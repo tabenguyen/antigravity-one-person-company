@@ -30,6 +30,12 @@ const ResultDataZ = z.object({
   equals: z.unknown().optional(),
   oneOf: z.array(z.unknown()).min(1).optional(),
   exists: z.boolean().optional(),
+  /** Value (stringified when not a string) matches this case-insensitive regular expression. */
+  pattern: z.string().min(1).optional(),
+  /** Value does NOT match this case-insensitive regular expression (an absent path passes). */
+  notPattern: z.string().min(1).optional(),
+  /** String value contains this substring (case-insensitive), or array value has this element. */
+  contains: z.unknown().optional(),
 });
 
 const CountZ = z.object({
@@ -55,6 +61,8 @@ const ToolNotCalledZ = z.object({ type: z.literal("tool.notCalled"), tool: z.str
 const TaskCreatedZ = CountZ.extend({
   type: z.literal("task.created"),
   kind: z.string().min(1),
+  /** Only count tasks assigned to this agent id (a roster agent, for delegation cases). */
+  assigneeAgentId: z.string().min(1).optional(),
   /** Only count tasks scheduled at least this many hours ahead (follow-ups that are not "tomorrow"). */
   minWakeHours: z.number().min(0).optional(),
 });
@@ -88,6 +96,8 @@ export const EvalCaseZ = z.object({
   /** Task kind to run, e.g. "sdr.handle_reply". */
   kind: z.string().min(1),
   contact: z.object({
+    /** An agent id from `agents` / the roster that owns the contact. Default: the eval agent (none for chief-of-staff). */
+    ownerAgentId: z.string().min(1).optional(),
     email: z.string().email(),
     name: z.string().optional(),
     title: z.string().optional(),
@@ -107,7 +117,14 @@ export const EvalCaseZ = z.object({
       inbound: z.array(z.object({ body: z.string(), subject: z.string().optional() })).default([]),
     })
     .optional(),
-  /** Task input; contact name/email, company, replyBody and threadSummary are filled from the seed when absent. */
+  /**
+   * Extra agents to provision next to the eval agent (shadow tier, never run), e.g. teammates a Chief of Staff may
+   * delegate to. Agents named in `input.roster` ({agentId, role, displayName}) are provisioned automatically.
+   */
+  agents: z
+    .array(z.object({ id: z.string().min(1), role: z.enum(["sales-sdr", "account-manager", "chief-of-staff"]), displayName: z.string().min(1).optional() }))
+    .default([]),
+  /** Task input; contactId, contact name/email, company, replyBody and threadSummary are filled from the seed when absent. */
   input: z.record(z.unknown()).default({}),
   assertions: z.array(AssertionZ).min(1),
 });

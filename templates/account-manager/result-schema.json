@@ -5,7 +5,10 @@
       "type": "string",
       "enum": ["done", "needs_human", "waiting_external", "failed"]
     },
-    "summary": { "type": "string" },
+    "summary": {
+      "type": "string",
+      "description": "One or two sentences a human can read without opening the transcript."
+    },
     "followUp": {
       "type": ["object", "null"],
       "properties": {
@@ -14,7 +17,10 @@
       },
       "required": ["afterHours", "note"]
     },
-    "data": { "type": "object" }
+    "data": {
+      "type": "object",
+      "description": "Task-kind-specific structured output, e.g. { classification, action, escalationReason } or { atRisk: [{ contactId, reason }] }."
+    }
   },
   "required": ["status", "summary"]
 }

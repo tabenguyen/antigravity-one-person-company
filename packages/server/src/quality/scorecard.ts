@@ -177,6 +177,26 @@ export function evaluatePromotion(
 
 const isHuman = (i: OutboxItem) => (i.decidedBy ?? "").startsWith("human:");
 
+/** Approval verdicts over a set of drafts (see the definitions at the top of this file). Shared with the KPI report. */
+export function summarizeDecisions(items: readonly OutboxItem[]) {
+  const approvedItems = items.filter((i) => i.decidedBy !== null && APPROVED_STATUSES.has(i.status));
+  const rejectedItems = items.filter((i) => i.status === "rejected" && isHuman(i));
+  const approved = approvedItems.length;
+  const rejected = rejectedItems.length;
+  const decided = approved + rejected;
+  const ratios = approvedItems.map((i) => editRatio(i.originalBody, i.body));
+  return {
+    approvedItems,
+    rejectedItems,
+    approved,
+    rejected,
+    decided,
+    approvalRate: decided > 0 ? approved / decided : null,
+    ratios,
+    medianEditRatio: median(ratios),
+  };
+}
+
 export function computeScorecard(
   db: Db,
   agent: Agent,
@@ -188,16 +208,8 @@ export function computeScorecard(
   const allItems = db.outbox.list({ agentId: agent.id });
   const items = allItems.filter((i) => i.createdAt >= sinceIso);
 
-  const approvedItems = items.filter((i) => i.decidedBy !== null && APPROVED_STATUSES.has(i.status));
-  const rejectedItems = items.filter((i) => i.status === "rejected" && isHuman(i));
-  const approved = approvedItems.length;
-  const rejected = rejectedItems.length;
-  const decided = approved + rejected;
-  const approvalRate = decided > 0 ? approved / decided : null;
-
-  const ratios = approvedItems.map((i) => editRatio(i.originalBody, i.body));
+  const { rejectedItems, approved, rejected, decided, approvalRate, ratios, medianEditRatio } = summarizeDecisions(items);
   const editedRate = ratios.length > 0 ? ratios.filter((r) => r > 0).length / ratios.length : null;
-  const medianEditRatio = median(ratios);
 
   const rejectionsByCategory: Partial<Record<RejectionCategory, number>> = {};
   for (const i of rejectedItems) {

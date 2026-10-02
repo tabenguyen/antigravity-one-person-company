@@ -72,7 +72,7 @@ Bạn đưa domain công ty → nhân viên SDR sẽ:
 5. **Follow-up đúng hẹn** — tự lên lịch nhắc lại, không để rơi lead.
 6. **Học từ bạn** — bạn sửa hay từ chối bản nháp kèm lý do ("giọng hơi ép"), nó nhớ và lần sau làm khác.
 
-Tất cả nằm trong **giao diện web** (Dashboard, Inbox duyệt email, Tasks xem agent đang làm gì theo thời gian thực, Contacts, Knowledge, Memory, Scorecards, Routines, Setup) và một CLI `hq` cho ai thích terminal.
+Tất cả nằm trong **giao diện web** (Dashboard, Inbox duyệt email, Tasks xem agent đang làm gì theo thời gian thực, Contacts, Knowledge, Memory, Scorecards, Routines, Briefings, Setup) và một CLI `hq` cho ai thích terminal.
 
 ## Vì sao dám để AI viết email cho khách?
 

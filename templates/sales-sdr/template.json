@@ -13,9 +13,11 @@
       { "server": "company", "tool": "crm_add_note" },
       { "server": "company", "tool": "crm_set_stage" },
       { "server": "company", "tool": "task_create" },
+      { "server": "company", "tool": "contact_handoff" },
       { "server": "company", "tool": "outbox_draft_email" }
     ]
   },
+  "routing": { "replyKind": "sdr.handle_reply", "followUpKinds": ["sdr.follow_up"] },
   "resultSchema": "result-schema.json",
   "taskKinds": [
     {

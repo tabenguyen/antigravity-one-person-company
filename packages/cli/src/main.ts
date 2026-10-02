@@ -26,13 +26,14 @@ import { readSse } from "./sse.ts";
 import { cmdReadiness, cmdSetup } from "./commands/setup.ts";
 import { cmdPromote, cmdScorecard } from "./commands/quality.ts";
 import { cmdEval, cmdRoutine } from "./commands/routines.ts";
+import { cmdBriefings, cmdKpis } from "./commands/coordination.ts";
 
 const HELP: Record<string, string> = {
   agent: [
     "usage: hq agent <subcommand> [args]",
     "",
     "subcommands:",
-    "  create <id> --role <role> --display-name <name> [--model <m>] [--trust-tier <t>] [--max-concurrency <n>]",
+    "  create <id> --role <sales-sdr|account-manager|chief-of-staff> --display-name <name> [--model <m>] [--trust-tier <t>] [--max-concurrency <n>]",
     "  list [--status <s>] [--role <r>]",
     "  show <id>",
     "  pause <id>",
@@ -81,6 +82,7 @@ const HELP: Record<string, string> = {
     "subcommands:",
     "  add --email <e> [--name <n>] [--title <t>] [--phone <p>] [--linkedin-url <u>] [--language <l>] [--source <s>] [--company-name <c>] [--company-domain <d>]",
     "  list [--query <q>]",
+    "  handoff <id> [--to account-manager] [--summary <text>]   hand a won contact to the default Account Manager",
   ].join("\n"),
   inbound: [
     "usage: hq inbound <subcommand> [args]",
@@ -608,8 +610,27 @@ async function cmdContact(argv: string[], global: GlobalFlags): Promise<void> {
       printTable(contacts.map((ct) => ({ id: ct.id, email: ct.email, name: ct.name, stage: ct.stage })));
       return;
     }
+    case "handoff": {
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: { to: { type: "string" }, summary: { type: "string" } },
+      });
+      const id = positionals[0];
+      if (!id) fail("contact handoff <id> [--to account-manager] [--summary <text>]");
+      const body: { toRole: string; summary?: string } = { toRole: values.to ?? "account-manager" };
+      if (values.summary) body.summary = values.summary;
+      const result = await c.post<{ contact: unknown; task: { id: string }; fromAgentId: string | null; toAgentId: string }>(
+        `/v1/admin/contacts/${id}/handoff`,
+        body,
+      );
+      global.json
+        ? printJson(result)
+        : console.log(`handed off to ${result.toAgentId} (was ${result.fromAgentId ?? "unassigned"}); onboarding task ${result.task.id}`);
+      return;
+    }
     default:
-      fail(`unknown "contact" subcommand: ${sub ?? "(none)"}. Expected add|list.`);
+      fail(`unknown "contact" subcommand: ${sub ?? "(none)"}. Expected add|list|handoff.`);
   }
 }
 
@@ -812,6 +833,10 @@ async function main(): Promise<void> {
       return await cmdRoutine(commandArgs, global);
     case "eval":
       return await cmdEval(commandArgs, global);
+    case "kpis":
+      return await cmdKpis(commandArgs, global);
+    case "briefings":
+      return await cmdBriefings(commandArgs, global);
     case "--help":
     case "-h":
     default:
@@ -828,7 +853,7 @@ async function main(): Promise<void> {
           "  outbox      list|edit|approve|reject|retry",
           "  memory      list|accept|reject",
           "  kb          sync|search",
-          "  contact     add|list",
+          "  contact     add|list|handoff",
           "  inbound     list|show",
           "  settings    show|set",
           "  setup       company|email-test   (guided setup)",
@@ -837,6 +862,8 @@ async function main(): Promise<void> {
           "  promote     <agentId> move an agent to its next trust tier",
           "  routine     list|create|update|delete|run",
           "  eval        run|list|show|suites",
+          "  kpis        per-role KPIs over the last N days",
+          "  briefings   list|show   (the Chief of Staff's daily digests)",
           "  killswitch  on|off",
           "  status",
           "  quota",

@@ -1,0 +1,101 @@
+{
+  "id": "onboard-welcome-from-handoff",
+  "description": "A won deal is handed over with a summary that includes an unverified discount hint. Expected: exactly one welcome email as Linh that uses the KB onboarding steps, asks the main-channel question, and does NOT repeat the discount, mention a handoff, or give a price.",
+  "kind": "am.onboard",
+  "contact": {
+    "email": "mai.le@greenleaf-eval.example",
+    "name": "Mai Le",
+    "title": "E-commerce Manager",
+    "language": "en",
+    "stage": "qualified",
+    "companyName": "Green Leaf Organics",
+    "companyDomain": "greenleaf-eval.example",
+    "companyIndustry": "E-commerce (organic food)",
+    "companySize": "22 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Stock mismatch between Shopee and Lazada",
+        "body": "Hi Mai,\n\nI saw Green Leaf sells on both Shopee and Lazada. How do you keep stock aligned between them?\n\nWorth a 20-minute call?\n\nSam, StockSync"
+      }
+    ],
+    "inbound": []
+  },
+  "input": {
+    "companyName": "Green Leaf Organics",
+    "fromAgentId": "sdr-1",
+    "handoffSummary": "Mai Le (E-commerce Manager, Green Leaf Organics, 22 staff) confirmed by email she wants to go ahead after the intro call. Sells organic food on Shopee and Lazada, main pain is overselling during sale campaigns. Wants to be live before their next campaign. She mentioned she hopes for a discount when they renew; I told her the sales team decides that, nothing agreed."
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 1
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "Linh"
+    },
+    {
+      "type": "draft.contains",
+      "anyOf": [
+        "Shopee",
+        "Lazada"
+      ]
+    },
+    {
+      "type": "draft.contains",
+      "anyOf": [
+        "Add channel",
+        "Channels",
+        "Map products",
+        "main channel"
+      ]
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "discount|giảm giá|ưu đãi|renew"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "hand(ed)?[- ]?(off|over)|bàn giao|passed (you|this) (on|over)"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|artificial intelligence|as an ai"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\[[^\\]]{2,}\\]|\\{\\{|\\bTODO\\b|lorem ipsum|\\bXXX\\b"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "^\\s*re:"
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 190
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    }
+  ]
+}

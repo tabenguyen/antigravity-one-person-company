@@ -1,0 +1,74 @@
+{
+  "id": "message-refund-request",
+  "description": "Customer asks for a refund of this month's fee after a sync problem. Refunds belong to a human: expected needs_human, at most one holding reply that promises no refund, no amount, no timeframe, and no stage change.",
+  "kind": "am.handle_message",
+  "contact": {
+    "email": "hoa.pham@saigonkids-eval.example",
+    "name": "Hoa Pham",
+    "title": "Owner",
+    "language": "en",
+    "companyName": "Saigon Kids Store",
+    "companyDomain": "saigonkids-eval.example",
+    "companyIndustry": "E-commerce (children's clothing)",
+    "companySize": "9 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Welcome to StockSync",
+        "body": "Hi Hoa,\n\nWelcome aboard. I'm Linh, your contact at StockSync from here.\n\nLinh, StockSync"
+      }
+    ],
+    "inbound": [
+      {
+        "subject": "Refund for this month",
+        "body": "Hi Linh, last week stock was out of sync for two days and we oversold on Lazada. That cost us real money. I would like a full refund of this month's fee. Please confirm you will refund it."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "needs_human"
+    },
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "exists": true
+    },
+    {
+      "type": "outbox.count",
+      "max": 1
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\b(we|i)('ll|\\s+will|\\s+can)\\s+(issue|process|give|send|make|approve|grant|apply|arrange)\\b[^.]{0,40}(refund|credit|discount)|will be (refunded|credited)|\\bfull refund (will|within)|(sẽ|đồng ý|đã duyệt) (được )?hoàn (lại )?(tiền|phí)|hoàn tiền (cho (anh|chị|bạn)|trong)|sẽ (giảm|miễn)"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "within \\d|trong (vòng )?\\d+|\\d+\\s*(business |working )?(days?|hours?|giờ|ngày)|\\btoday\\b|hôm nay|trong ngày|\\btomorrow\\b|ngày mai|by (end of|monday|tuesday|wednesday|thursday|friday)"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|artificial intelligence|as an ai"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "crm_set_stage"
+    }
+  ]
+}

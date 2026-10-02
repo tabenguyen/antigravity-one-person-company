@@ -221,6 +221,35 @@ describe("computeReadiness", () => {
     expect(byId(await run(db, config), "settings.default_sdr").status).toBe("pass");
   });
 
+  it("an account-manager-only setup is a warning, not a failure", async () => {
+    const config = readyConfig();
+    const db = openTestDb();
+    db.agents.create({ id: "am-01", role: "account-manager", displayName: "Linh", model: "m", workspacePath: "/tmp/a", policy: { builtins: [], mcp: [] } });
+    expect(byId(await run(db, config), "agents.sdr_present").status).toBe("warn");
+  });
+
+  it("default Account Manager / Chief of Staff checks appear only when the role is in use", async () => {
+    const config = readyConfig();
+    const db = openTestDb();
+    const ids = async () => (await run(db, config)).checks.map((c) => c.id);
+    expect(await ids()).not.toContain("settings.default_am");
+    expect(await ids()).not.toContain("settings.default_cos");
+
+    db.agents.create({ id: "am-01", role: "account-manager", displayName: "Linh", model: "m", workspacePath: "/tmp/a", policy: { builtins: [], mcp: [] } });
+    db.agents.create({ id: "cos-01", role: "chief-of-staff", displayName: "Khoa", model: "m", workspacePath: "/tmp/c", policy: { builtins: [], mcp: [] } });
+    expect(byId(await run(db, config), "settings.default_am").status).toBe("warn");
+    expect(byId(await run(db, config), "settings.default_cos").status).toBe("warn");
+
+    db.settings.patch({ defaultAmAgentId: "am-01", defaultCosAgentId: "cos-01" });
+    expect(byId(await run(db, config), "settings.default_am").status).toBe("pass");
+    expect(byId(await run(db, config), "settings.default_cos").status).toBe("pass");
+
+    db.agents.setStatus("am-01", "paused");
+    expect(byId(await run(db, config), "settings.default_am").status).toBe("warn");
+    db.settings.patch({ defaultAmAgentId: null });
+    expect(await ids()).not.toContain("settings.default_am"); // nobody active, nothing set: nothing to say
+  });
+
   it("settings checks: quiet hours and rate", async () => {
     const config = readyConfig();
     const db = openTestDb();

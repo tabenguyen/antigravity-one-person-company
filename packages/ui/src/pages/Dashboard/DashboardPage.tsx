@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { formatDateTime } from "../../lib/time.ts";
 import { eventHub, type HubEvent } from "../../api/sse.ts";
 import { readinessApi, type ReadinessCheck } from "../../api/readiness.ts";
+import { KpiSection } from "./KpiSection.tsx";
 import { ReadinessSummaryCard } from "../Setup/ReadinessSummaryCard.tsx";
 
 export function DashboardPage() {
@@ -131,6 +132,8 @@ export function DashboardPage() {
           <p className="faint">agy-hq daemon {status?.version ?? "—"}</p>
         </div>
       </div>
+
+      <KpiSection />
 
       <h2>Per-agent stats ({statsData?.days ?? 7}d)</h2>
       {statsError && <p className="form-error">{statsError}</p>}

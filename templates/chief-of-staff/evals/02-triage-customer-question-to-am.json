@@ -1,0 +1,71 @@
+{
+  "id": "triage-customer-question-to-am",
+  "description": "Someone who says they are an existing customer asks a how-to question. Expected: delegated to the Account Manager with a message-handling kind from the roster, not to the SDR.",
+  "kind": "cos.triage",
+  "contact": {
+    "email": "quang.tran@minhphat-eval.example",
+    "name": "Quang Tran",
+    "language": "en",
+    "source": "inbound-email",
+    "companyName": "Minh Phat Trading",
+    "companyDomain": "minhphat-eval.example"
+  },
+  "input": {
+    "inboundEventId": "evt-eval-002",
+    "fromAddress": "quang.tran@minhphat-eval.example",
+    "fromName": "Quang Tran",
+    "subject": "How do I export last month's orders?",
+    "body": "Hi team, we have been using StockSync for two months. Where do I export last month's orders to CSV? Thanks, Quang",
+    "classification": "other",
+    "roster": [
+      {
+        "agentId": "eval-sdr",
+        "role": "sales-sdr",
+        "displayName": "Mai",
+        "kinds": [
+          "sdr.research_lead",
+          "sdr.first_touch",
+          "sdr.follow_up",
+          "sdr.handle_reply",
+          "sdr.pipeline_review"
+        ]
+      },
+      {
+        "agentId": "eval-am",
+        "role": "account-manager",
+        "displayName": "Linh",
+        "kinds": [
+          "am.onboard",
+          "am.handle_message",
+          "am.check_in",
+          "am.account_review"
+        ]
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "result.data.path",
+      "path": "decision.action",
+      "equals": "delegated"
+    },
+    {
+      "type": "result.data.path",
+      "path": "decision.assigneeAgentId",
+      "equals": "eval-am"
+    },
+    {
+      "type": "result.data.path",
+      "path": "decision.kind",
+      "equals": "am.handle_message"
+    },
+    {
+      "type": "tool.called",
+      "tool": "task_create"
+    }
+  ]
+}
