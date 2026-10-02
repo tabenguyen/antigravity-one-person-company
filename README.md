@@ -33,6 +33,24 @@ Không ủng hộ được cũng không sao, một ⭐ cho repo hay chia sẻ ch
 > Không có server AI riêng. Không có `OPENAI_API_KEY`. Không có `GEMINI_API_KEY`.
 > Nó gọi thẳng `agy` CLI đã đăng nhập trên máy bạn → dùng đúng quota tài khoản Google của bạn.
 
+## Xem Mai làm việc
+
+Khách trả lời email chào hàng lúc 10:14. Chưa tới 5 phút sau, khách đã nhận được câu trả lời đúng sản phẩm, đúng bảng giá, kèm link đặt lịch demo. Chủ công ty không phải chạm tay vào.
+
+**1. Email khách gửi tới được phân loại và giao việc tự động.** Trả lời, hủy đăng ký, thư tự động, email lỗi, lead mới từ form: mỗi loại một đường xử lý, và chỉ những email cần suy nghĩ mới tốn quota AI.
+
+![Inbound: email của khách được phân loại và chuyển thành việc cho Mai](docs/images/demo-1-inbound.png)
+
+**2. Mai soạn câu trả lời theo kho kiến thức và bảng giá, rồi tự gửi** (`policy:autonomous`). Lý do của agent được lưu lại để bạn kiểm tra bất cứ lúc nào.
+
+![Inbox: câu trả lời Mai đã tự gửi cho khách, kèm lý do và ngữ cảnh khách hàng](docs/images/demo-2-auto-reply-sent.png)
+
+**3. Toàn bộ lịch sử với khách nằm trong CRM**: nghiên cứu → chào hàng → khách trả lời → AI trả lời → cập nhật giai đoạn bán hàng.
+
+![Contact: dòng thời gian với khách hàng Trần Thu Hà](docs/images/demo-3-contact-timeline.png)
+
+> Ảnh dùng dữ liệu minh hoạ: BookNhanh và các khách hàng đều là hư cấu. Chế độ tự gửi chỉ chạy khi bạn nâng nhân viên lên `autonomous`, và chỉ với khách đã từng nhận một email do bạn duyệt. Mặc định, mọi email đều chờ bạn bấm duyệt.
+
 ## So sánh nhanh
 
 |  | Thuê nhân viên sales | Tự dựng agent bằng API | **Dự án này** |
