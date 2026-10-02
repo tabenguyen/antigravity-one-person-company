@@ -12,6 +12,16 @@
 
 ---
 
+## ☕ Ủng hộ
+
+Nếu dự án giúp bạn bớt được một khoản tiền API hay vài giờ trả lời email, mời mình một ly cà phê để mình có thêm động lực làm tiếp các vai trò mới:
+
+[![Ủng hộ trên Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/tabenguyen)
+
+Không ủng hộ được cũng không sao, một ⭐ cho repo hay chia sẻ cho người cần đã là giúp nhiều lắm rồi.
+
+---
+
 ## Bạn có đang ở đây không?
 
 - Bạn làm **một mình** (hoặc vài người): vừa code, vừa bán hàng, vừa chăm khách, vừa trả lời email lúc 11 giờ đêm.
@@ -165,14 +175,6 @@ npm run typecheck && npm test
 Test mặc định chạy offline (giả lập `agy` và hộp thư), không tốn quota.
 
 Quy ước commit, đánh số phiên bản và cách release: [RELEASING.md](RELEASING.md). Các thay đổi qua từng phiên bản: [CHANGELOG.md](CHANGELOG.md).
-
-## ☕ Ủng hộ
-
-Nếu dự án giúp bạn bớt được một khoản tiền API hay vài giờ trả lời email, mời mình một ly cà phê để mình có thêm động lực làm tiếp các vai trò mới:
-
-[![Ủng hộ trên Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/tabenguyen)
-
-Không ủng hộ được cũng không sao, một ⭐ cho repo hay chia sẻ cho người cần đã là giúp nhiều lắm rồi.
 
 ## English (TL;DR)
 
