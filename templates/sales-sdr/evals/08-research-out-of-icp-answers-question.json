@@ -1,0 +1,26 @@
+{
+  "id": "research-out-of-icp-answers-question",
+  "description": "Inbound email from a one-person, single-channel seller asking whether Amazon is supported. Out of ICP (individual, one channel), but the knowledge base answers the question directly (Amazon is not supported today). Expected: disqualify with fit=fail, exactly one short reply that answers the question, no price, no first-touch task.",
+  "kind": "sdr.research_lead",
+  "contact": {
+    "email": "an.le@gmail-eval.example",
+    "name": "An Le",
+    "language": "en",
+    "stage": "new",
+    "source": "inbound-email"
+  },
+  "input": {
+    "context": "Do you support Amazon?\n\nHi, I sell handmade candles on my own, only on Shopee for now. I'm thinking of also listing on Amazon. Does StockSync work with Amazon?"
+  },
+  "assertions": [
+    { "type": "result.status", "equals": "done" },
+    { "type": "result.data.path", "path": "fit", "equals": "fail" },
+    { "type": "contact.stage", "equals": "disqualified" },
+    { "type": "outbox.count", "equals": 1 },
+    { "type": "draft.contains", "pattern": "Amazon" },
+    { "type": "draft.maxWords", "max": 150 },
+    { "type": "draft.notContains", "pattern": "\\d[\\d.,]*\\s*(?:VND|VNĐ|đ|USD|\\$)|\\$\\s*\\d|cal\\.example\\.com" },
+    { "type": "draft.lintErrors", "equals": 0 },
+    { "type": "task.created", "kind": "sdr.first_touch", "max": 0 }
+  ]
+}

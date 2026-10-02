@@ -1,0 +1,54 @@
+{
+  "_comment": "Copy to agyhq.config.json (repo root) and edit, or point --config / AGYHQ_CONFIG at a copy elsewhere. Every field is optional — anything omitted falls back to a sensible default (see packages/server/src/config.ts).",
+
+  "dataDir": "./data",
+  "host": "127.0.0.1",
+  "port": 7317,
+
+  "companyName": "Your Company",
+
+  "templatesRoot": "./templates",
+  "kbRoot": "./kb",
+
+  "agyBin": "agy",
+
+  "hooksDistDir": "./packages/hooks/dist",
+  "mcpEntry": "./packages/mcp/dist/company-mcp.mjs",
+
+  "workerConcurrency": 3,
+  "pollIntervalMs": 1000,
+  "runTimeoutMs": 600000,
+
+  "quota": {
+    "minRemainingFraction": 0.15,
+    "pollIntervalMs": 300000
+  },
+
+  "outboxDailyLimit": 50,
+
+  "_comment_phase2": "Phase 2: inbound/outbound email. email.kind: \"none\" (default) | \"maildir\" (local dev/testing) | \"imap-smtp\" (real mailbox). imap/smtp passwords here are overridden by AGYHQ_IMAP_PASS / AGYHQ_SMTP_PASS env vars if set — prefer the env vars and leave \"pass\" out of the file.",
+  "email": {
+    "kind": "none"
+  },
+  "_comment_email_maildir_example": "{ \"kind\": \"maildir\", \"root\": \"./data/maildir\", \"address\": \"sdr@yourcompany.com\", \"pollIntervalMs\": 60000 }",
+  "_comment_email_imap_smtp_example": "{ \"kind\": \"imap-smtp\", \"address\": \"sdr@yourcompany.com\", \"displayName\": \"Mai\", \"imap\": { \"host\": \"imap.yourmail.com\", \"port\": 993, \"secure\": true, \"user\": \"sdr@yourcompany.com\", \"pass\": \"\" }, \"smtp\": { \"host\": \"smtp.yourmail.com\", \"port\": 465, \"secure\": true, \"user\": \"sdr@yourcompany.com\", \"pass\": \"\" }, \"mailbox\": \"INBOX\", \"sentFolder\": \"Sent\", \"pollIntervalMs\": 60000 }",
+
+  "sender": {
+    "name": "Your Company Sales",
+    "address": "sdr@yourcompany.com",
+    "companyAddressLine": "Your Company, 123 Main St, City, Country"
+  },
+
+  "unsubscribeMailto": "unsubscribe@yourcompany.com",
+
+  "_comment_webhooks": "Per-source shared secret checked via header x-agyhq-webhook-secret on POST /v1/inbound/webhook/:source. Example: { \"typeform\": { \"secret\": \"change-me\" } }",
+  "webhooks": {},
+
+  "routing": {
+    "replyKind": "sdr.handle_reply",
+    "newLeadKind": "sdr.research_lead",
+    "followUpKind": "sdr.follow_up"
+  },
+
+  "uiDist": "./packages/ui/dist"
+}

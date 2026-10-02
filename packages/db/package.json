@@ -1,0 +1,13 @@
+{
+  "name": "@agyhq/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.0.0",
+    "@agyhq/core": "*"
+  }
+}

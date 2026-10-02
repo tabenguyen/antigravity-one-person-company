@@ -1,0 +1,25 @@
+{
+  "name": "agy-hq",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/ui/tsconfig.json",
+    "test": "vitest run",
+    "build": "npm run build --workspaces --if-present",
+    "hq": "tsx packages/cli/src/main.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "tsx": "^4.20.0",
+    "@types/node": "^20.19.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "esbuild": "^0.25.0"
+  }
+}

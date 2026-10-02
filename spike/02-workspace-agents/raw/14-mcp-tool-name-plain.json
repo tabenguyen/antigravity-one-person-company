@@ -1,0 +1,3 @@
+error: failed to construct executor: failed to resolve components: unknown component: tool "kb_search" not found in registry
+AGY_ERROR: {"short_error":"failed to construct executor: failed to resolve components: unknown component: tool \"kb_search\" not found in registry","status":"UNKNOWN","error_code":2,"code_kind":"grpc","retryable":false,"error_id":"25fbb2d7-a899-4fbd-9b05-fafd618b18ed-1"}
+{"conversation_id":"df5a8540-c5e3-4c85-b868-d6f129d60b9c","status":"ERROR","response":"","error":"failed to construct executor: failed to resolve components: unknown component: tool \"kb_search\" not found in registry","duration_seconds":0,"num_turns":1,"usage":{"input_tokens":0,"output_tokens":0,"thinking_tokens":0,"cache_read_tokens":0,"total_tokens":0}}

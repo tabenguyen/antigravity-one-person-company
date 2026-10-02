@@ -1,0 +1,41 @@
+{
+  "id": "reply-vietnamese-language",
+  "description": "Prospect replies in Vietnamese with a question the KB can answer (how stock sync works). Expected: a Vietnamese draft that answers from the KB, no price, no invented facts.",
+  "kind": "sdr.handle_reply",
+  "contact": {
+    "email": "ha.thu@lamdep-eval.example",
+    "name": "Thu Hà",
+    "title": "Chủ shop",
+    "language": "vi",
+    "companyName": "Lam Dep Cosmetics",
+    "companyDomain": "lamdep-eval.example",
+    "companyIndustry": "Mỹ phẩm bán online",
+    "companySize": "12 nhân viên",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Tồn kho Shopee và Lazada của Lam Dep",
+        "body": "Chào chị Hà,\n\nEm thấy Lam Dep đang bán trên cả Shopee và Lazada. Khi một sản phẩm hết hàng ở kênh này, kênh kia có cập nhật kịp không ạ?\n\nStockSync tự động đồng bộ tồn kho giữa các kênh trong khoảng một phút. Chị có muốn trao đổi nhanh 20 phút không ạ?\n\nMai, StockSync\n(Trả lời UNSUBSCRIBE nếu chị không muốn nhận email.)"
+      }
+    ],
+    "inbound": [
+      {
+        "body": "Chào bạn, mình thấy giải pháp này khá hay. Bạn có thể nói rõ hơn về cách đồng bộ tồn kho giữa Shopee và Lazada được không? Cài đặt có phức tạp không? Cảm ơn bạn."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    { "type": "result.status", "oneOf": ["done", "needs_human"] },
+    { "type": "outbox.count", "equals": 1 },
+    { "type": "draft.contains", "pattern": "[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]" },
+    { "type": "draft.notContains", "pattern": "\\b(dear|best regards|kind regards|thank you for your)\\b" },
+    { "type": "draft.contains", "anyOf": ["Shopee", "Lazada"] },
+    { "type": "draft.notContains", "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d" },
+    { "type": "draft.notContains", "pattern": "\\[[^\\]]{2,}\\]|\\{\\{|\\bTODO\\b|lorem ipsum|\\bXXX\\b" },
+    { "type": "draft.lintErrors", "equals": 0 },
+    { "type": "contact.stage", "oneOf": ["replied", "qualified"] }
+  ]
+}

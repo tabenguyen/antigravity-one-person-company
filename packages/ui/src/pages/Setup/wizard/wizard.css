@@ -1,0 +1,433 @@
+/* Setup wizard. Tokens only; stepper is a left rail on desktop and a compact row below 820px. */
+
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1080px;
+}
+.wz-head h1 {
+  margin-bottom: var(--space-1);
+}
+.wz-head p {
+  margin: 0;
+}
+.wz-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* Stepper */
+.wz-stepper {
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--space-3));
+}
+.wz-stepper ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.wz-step {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.wz-step:hover {
+  background: var(--color-surface-alt);
+}
+.wz-step:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.is-current .wz-step {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+.wz-step-num {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+}
+.wz-step[data-status="done"] .wz-step-num {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+.wz-step[data-status="attention"] .wz-step-num {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.wz-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wz-step-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+.wz-step-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.wz-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-text-faint);
+}
+.wz-dot-done {
+  background: var(--color-success);
+}
+.wz-dot-attention {
+  background: var(--color-warning);
+}
+.wz-dot-todo,
+.wz-dot-unknown {
+  background: var(--color-border);
+  box-shadow: inset 0 0 0 1px var(--color-text-faint);
+}
+
+/* Main */
+.wz-main {
+  min-width: 0;
+  outline: none;
+}
+.wz-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.wz-title {
+  margin: 0;
+}
+.wz-card {
+  margin: 0;
+}
+.wz-card h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 15px;
+}
+.wz-card h4,
+.wz-callout h4 {
+  margin: 0 0 var(--space-1);
+  font-size: 14px;
+}
+.wz-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.wz-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.wz-note {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+}
+.wz-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  margin: var(--space-2) 0;
+}
+.wz-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: var(--space-2);
+}
+.wz-card input[type="text"],
+.wz-card input[type="email"],
+.wz-card input[type="password"],
+.wz-card input[type="url"],
+.wz-card textarea,
+.wz-card select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.wz-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.wz-inline {
+  display: flex;
+  gap: var(--space-2);
+}
+.wz-inline input {
+  flex: 1;
+}
+.wz-suggest {
+  margin-left: var(--space-2);
+  font-size: 11px;
+  padding: 1px 8px;
+}
+
+/* Generation */
+.wz-log {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wz-log li {
+  overflow-wrap: anywhere;
+}
+.wz-log time {
+  color: var(--color-text-faint);
+}
+.wz-review summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+.wz-callout {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+}
+.wz-callout p {
+  margin: 0 0 var(--space-2);
+}
+.wz-callout ul,
+.wz-sources ul,
+.wz-bullets {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
+}
+.wz-callout-warn {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning);
+  color: var(--color-text);
+}
+.wz-callout-warn h4 {
+  color: var(--color-warning);
+}
+.wz-callout-info {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+.wz-sources li {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+/* Knowledge */
+.wz-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.wz-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.wz-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 320px;
+}
+.wz-preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  max-height: 460px;
+  overflow: auto;
+  min-width: 0;
+}
+.wz-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-bottom: var(--space-2);
+}
+.wz-add {
+  margin-top: var(--space-3);
+}
+
+/* Email */
+.wz-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+.wz-preset {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wz-preset:hover {
+  border-color: var(--color-accent);
+}
+.wz-preset[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+.wz-preset:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.wz-test-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  font-size: 13px;
+}
+.wz-test-list li {
+  margin: 0 0 var(--space-1);
+  overflow-wrap: anywhere;
+}
+.wz-ok {
+  color: var(--color-success);
+}
+
+/* Sender */
+.wz-footer-preview {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Agents */
+.wz-agents {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+.wz-agent {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.wz-agent input {
+  margin-top: 4px;
+}
+
+@media (max-width: 820px) {
+  .wz-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  .wz-stepper {
+    position: static;
+  }
+  .wz-stepper ol {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 2px;
+    overflow-x: auto;
+  }
+  .wz-stepper li {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .wz-step {
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-2) 2px;
+    text-align: center;
+  }
+  .wz-step-text {
+    align-items: center;
+  }
+  /* Labels stay in the accessibility tree; only the current step shows its text. */
+  .wz-stepper li:not(.is-current) .wz-step-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .wz-stepper li:not(.is-current) .wz-step-num {
+    width: 30px;
+    height: 30px;
+  }
+  .wz-two,
+  .wz-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wz-stepper {
+    position: sticky;
+    top: var(--topbar-height);
+    z-index: 5;
+    background: var(--color-bg);
+    padding: var(--space-1) 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .wz-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-bg);
+    padding-bottom: var(--space-2);
+  }
+  .wz-footer .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

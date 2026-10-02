@@ -1,0 +1,86 @@
+ERROR:root:Failed to start Agent session, cleaning up...
+Traceback (most recent call last):
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1362, in _validate_connection
+    m.endpoint.validate_endpoint()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/models.py", line 120, in validate_endpoint
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: A Gemini API key is required. Set it via GEMINI_API_KEY environment variable or via LocalAgentConfig(api_key=...).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/agent.py", line 110, in __aenter__
+    self._conversation = await self._exit_stack.enter_async_context(
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        conversation_lib.Conversation.create(self._strategy)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 668, in enter_async_context
+    result = await _enter(cm)
+             ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/conversation/conversation.py", line 86, in create
+    async with strategy:
+               ^^^^^^^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1399, in __aenter__
+    self._validate_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1364, in _validate_connection
+    raise types.AntigravityValidationError(str(e)) from e
+google.antigravity.types.AntigravityValidationError: A Gemini API key is required. Set it via GEMINI_API_KEY environment variable or via LocalAgentConfig(api_key=...).
+Traceback (most recent call last):
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1362, in _validate_connection
+    m.endpoint.validate_endpoint()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/models.py", line 120, in validate_endpoint
+    raise ValueError(
+    ...<3 lines>...
+    )
+ValueError: A Gemini API key is required. Set it via GEMINI_API_KEY environment variable or via LocalAgentConfig(api_key=...).
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/sdk/01_quickstart.py", line 10, in <module>
+    asyncio.run(main())
+    ~~~~~~~~~~~^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/sdk/01_quickstart.py", line 6, in main
+    async with Agent(config) as agent:
+               ~~~~~^^^^^^^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/agent.py", line 110, in __aenter__
+    self._conversation = await self._exit_stack.enter_async_context(
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        conversation_lib.Conversation.create(self._strategy)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 668, in enter_async_context
+    result = await _enter(cm)
+             ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py", line 214, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/conversation/conversation.py", line 86, in create
+    async with strategy:
+               ^^^^^^^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1399, in __aenter__
+    self._validate_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/nguyentam/Documents/Makini/agy-ui/spike/04-concurrency-sdk/.venv/lib/python3.14/site-packages/google/antigravity/connections/local/local_connection.py", line 1364, in _validate_connection
+    raise types.AntigravityValidationError(str(e)) from e
+google.antigravity.types.AntigravityValidationError: A Gemini API key is required. Set it via GEMINI_API_KEY environment variable or via LocalAgentConfig(api_key=...).

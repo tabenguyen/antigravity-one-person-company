@@ -1,0 +1,16 @@
+{
+  "name": "@agyhq/hooks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs"
+  },
+  "dependencies": {
+    "@agyhq/core": "*",
+    "zod": "^3.25.0"
+  }
+}

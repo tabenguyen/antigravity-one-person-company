@@ -1,0 +1,67 @@
+// Central re-export of the wire types agy-ui consumes. Keeping this in one
+// place makes it obvious which slice of the contract (packages/server/src/
+// admin-types.ts + packages/core/src/domain.ts) the UI actually uses.
+// Type-only imports: with verbatimModuleSyntax these are fully erased, so
+// nothing from @agyhq/server's runtime (hono, @agyhq/db, ...) ends up in the
+// bundle.
+
+export type {
+  Agent,
+  AgentRole,
+  AgentStatus,
+  TrustTier,
+  ToolPolicy,
+  McpToolRef,
+  Task,
+  TaskStatus,
+  TaskResult,
+  OutboxItem,
+  OutboxStatus,
+  OutboxChannel,
+  MemoryItem,
+  MemoryStatus,
+  Contact,
+  Company,
+  Note,
+  LeadStage,
+  InboundEvent,
+  InboundSource,
+  InboundClassification,
+  InboundStatus,
+  HqSettings,
+  AuditEvent,
+  AuditKind,
+  QuotaBucket,
+  KbHit,
+  KbScope,
+  Iso,
+  ApiEnvelope,
+  ApiErrorCode,
+  ContactView,
+} from "@agyhq/core";
+
+export type {
+  CreateAgentRequest,
+  PatchAgentRequest,
+  ListAgentsQuery,
+  CreateTaskRequest,
+  ListTasksQuery,
+  ListOutboxQuery,
+  EditOutboxRequest,
+  ApproveOutboxRequest,
+  RejectOutboxRequest,
+  ListMemoryQuery,
+  KbDocSummary,
+  PutKbFileRequest,
+  DeleteKbFileRequest,
+  CreateContactRequest,
+  ImportContactsRequest,
+  ListInboundQuery,
+  WebhookLeadRequest,
+  KillSwitchRequest,
+  DaemonStatus,
+  AgentStats,
+  TimelineEntry,
+  TranscriptStep,
+  SseEventType,
+} from "@agyhq/server";

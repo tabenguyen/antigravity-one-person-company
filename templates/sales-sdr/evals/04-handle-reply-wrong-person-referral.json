@@ -1,0 +1,43 @@
+{
+  "id": "reply-wrong-person-referral",
+  "description": "Contact says they are the wrong person and names a colleague with an email. Expected: the colleague becomes a new contact and/or a research task (not a cold email straight to them); note on the original contact.",
+  "kind": "sdr.handle_reply",
+  "contact": {
+    "email": "quang.bui@greenleaf-eval.example",
+    "name": "Quang Bui",
+    "title": "Warehouse Supervisor",
+    "language": "en",
+    "companyName": "GreenLeaf Organics",
+    "companyDomain": "greenleaf-eval.example",
+    "companyIndustry": "Organic food and household products",
+    "companySize": "45 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Overselling across your Shopee and Lazada shops",
+        "body": "Hi Quang,\n\nGreenLeaf sells on Shopee and Lazada. How do you keep stock counts consistent between the two when you're fulfilling orders?\n\nStockSync syncs them automatically within about a minute. Open to a 20-minute call?\n\nMai, StockSync\n(Reply UNSUBSCRIBE and we'll stop.)"
+      }
+    ],
+    "inbound": [
+      {
+        "body": "Hi Mai, I only handle the warehouse so I'm not the right person for this. Our e-commerce manager Hoa Tran runs the Shopee and Lazada shops and decides on tools like this: hoa.tran@greenleaf-eval.example. Please talk to her instead."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    {
+      "type": "any",
+      "of": [
+        { "type": "contact.exists", "email": "hoa.tran@greenleaf-eval.example" },
+        { "type": "task.created", "kind": "sdr.research_lead", "min": 1 }
+      ]
+    },
+    { "type": "draft.notTo", "email": "hoa.tran@greenleaf-eval.example" },
+    { "type": "outbox.count", "max": 1 },
+    { "type": "tool.called", "tool": "crm_add_note" },
+    { "type": "result.data.path", "path": "classification", "oneOf": ["wrong-person", "wrong_person", "referral"] }
+  ]
+}

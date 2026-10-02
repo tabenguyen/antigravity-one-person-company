@@ -1,0 +1,25 @@
+{
+  "audit": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [{ "type": "command", "command": "node scripts/pre-tool-use.mjs", "timeout": 10 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [{ "type": "command", "command": "node scripts/post-tool-use.mjs", "timeout": 10 }]
+      }
+    ],
+    "PreInvocation": [
+      { "type": "command", "command": "node scripts/pre-invocation.mjs", "timeout": 10 }
+    ],
+    "PostInvocation": [
+      { "type": "command", "command": "node scripts/post-invocation.mjs", "timeout": 10 }
+    ],
+    "Stop": [
+      { "type": "command", "command": "node scripts/stop.mjs", "timeout": 10 }
+    ]
+  }
+}

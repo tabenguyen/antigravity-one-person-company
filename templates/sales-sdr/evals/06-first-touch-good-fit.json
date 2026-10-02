@@ -1,0 +1,73 @@
+{
+  "id": "first-touch-good-fit",
+  "description": "Qualified, in-ICP lead. Expected: exactly one short draft (<=150 words), no placeholders, no invented price or claims, ends with a question / single call to action, and invents neither calendar availability nor a meeting length (the KB only knows a 20-minute intro call and has no calendar tool).",
+  "kind": "sdr.first_touch",
+  "contact": {
+    "email": "linh.pham@saigonhome-eval.example",
+    "name": "Linh Pham",
+    "title": "Founder and CEO",
+    "language": "en",
+    "stage": "researching",
+    "source": "agy-hq eval (fictional lead)",
+    "companyName": "Saigon Home Goods",
+    "companyDomain": "saigonhome-eval.example",
+    "companyIndustry": "Home goods e-commerce",
+    "companySize": "25 employees",
+    "companyCountry": "Vietnam"
+  },
+  "input": {
+    "qualificationSummary": "Saigon Home Goods (Ho Chi Minh City, about 25 staff) sells kitchenware and home decor on Shopee, Lazada and its own Shopify store. Founder Linh Pham makes tool decisions herself. A recent public Shopee review mentions an order cancelled because the item was out of stock although the listing showed availability, which suggests stock is not synced across channels. In ICP: multi-channel physical-goods retailer in Vietnam.",
+    "bantScore": "16/20 (Budget 3, Authority 5, Need 4, Timeline 4)"
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 1
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 150
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\[[^\\]]{2,}\\]|\\{\\{|\\bTODO\\b|lorem ipsum|\\bXXX\\b"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "\\?"
+    },
+    {
+      "type": "draft.notContains",
+      "anyOf": [
+        "guarantee",
+        "100%",
+        "best in the market",
+        "industry-leading"
+      ]
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\b(i'?m|i am|we'?re|we are) (free|available)\\b|\\bavailable (on|this|tomorrow|next)\\b"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\b(10|15|30|45|60)[- ]?(minute|min)s?\\b"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "outbox_draft_email"
+    }
+  ]
+}

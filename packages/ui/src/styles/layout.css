@@ -1,0 +1,168 @@
+.shell {
+  display: grid;
+  /* minmax(0, …): wide children must never push the page past the viewport. */
+  grid-template-columns: var(--nav-width) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) 1fr;
+  grid-template-areas:
+    "nav topbar"
+    "nav main";
+  height: 100%;
+}
+
+.topbar {
+  grid-area: topbar;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.nav {
+  grid-area: nav;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3);
+  gap: var(--space-1);
+  overflow-y: auto;
+}
+
+.nav-brand {
+  font-weight: 700;
+  padding: var(--space-2) var(--space-2) var(--space-4);
+  font-size: 15px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.nav-link.active {
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+.nav-badge {
+  background: var(--color-danger);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  font-weight: 700;
+}
+
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.nav-toggle {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--topbar-height) 1fr;
+    grid-template-areas:
+      "topbar"
+      "main";
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .nav {
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    bottom: 0;
+    width: 230px;
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform 0.15s ease;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .nav.open {
+    transform: translateX(0);
+  }
+
+  .nav-backdrop {
+    position: fixed;
+    inset: 0;
+    top: var(--topbar-height);
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 20;
+  }
+
+  .main {
+    padding: var(--space-3);
+  }
+}
+
+.main {
+  min-width: 0;
+}
+
+/* The outbound status pill can carry a long reason; keep it on one line and let it shrink
+   (the full text is in its title tooltip). */
+.topbar .status-pill {
+  min-width: 96px; /* always leave "OUTBOUND…" readable */
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+}
+
+.topbar > :not(.status-pill) {
+  flex-shrink: 0;
+}
+
+.topbar .pill-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nav-toggle {
+  margin-right: auto; /* keep the menu button pinned left; the topbar is right-aligned */
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    gap: 6px;
+    padding: 0 var(--space-2);
+  }
+  /* Only the coloured dot on phones; state stays in the title tooltip. */
+  .conn-indicator {
+    font-size: 0;
+  }
+}

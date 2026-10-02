@@ -1,0 +1,4 @@
+[result] OK | num_turns= 1
+[result] The secret word is WRAPPER_TEST_42. | num_turns= 2
+exit: 0
+EXIT=0

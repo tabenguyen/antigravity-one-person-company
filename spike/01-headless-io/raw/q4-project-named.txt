@@ -1,0 +1,2 @@
+{"conversation_id":"db5f45dd-9a9e-4d28-a33c-cd6ad10b1f21","status":"SUCCESS","response":"Hi again! How can I help you today?\n","duration_seconds":3.327743,"num_turns":1,"usage":{"input_tokens":12279,"output_tokens":10,"thinking_tokens":0,"cache_read_tokens":0,"total_tokens":12289}}
+EXIT=0

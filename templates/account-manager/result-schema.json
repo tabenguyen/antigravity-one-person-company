@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "needs_human", "waiting_external", "failed"]
+    },
+    "summary": { "type": "string" },
+    "followUp": {
+      "type": ["object", "null"],
+      "properties": {
+        "afterHours": { "type": "number" },
+        "note": { "type": "string" }
+      },
+      "required": ["afterHours", "note"]
+    },
+    "data": { "type": "object" }
+  },
+  "required": ["status", "summary"]
+}

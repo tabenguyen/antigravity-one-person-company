@@ -1,0 +1,19 @@
+{
+  "name": "@agyhq/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@agyhq/core": "*",
+    "@agyhq/db": "*",
+    "@agyhq/runner": "*",
+    "@agyhq/workspace": "*",
+    "@agyhq/channels": "*",
+    "hono": "^4.9.0",
+    "imapflow": "^1.0.190",
+    "nodemailer": "^7.0.0",
+    "@hono/node-server": "^1.19.0",
+    "zod": "^3.25.0"
+  }
+}

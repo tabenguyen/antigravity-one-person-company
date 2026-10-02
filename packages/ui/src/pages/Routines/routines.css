@@ -1,0 +1,246 @@
+/* Routines & evals page. Tokens only. */
+
+.routines-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.rt-section h2 {
+  margin: 0;
+}
+
+.rt-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.rt-table-wrap {
+  overflow-x: auto;
+}
+
+.rt-table-wrap table {
+  min-width: 720px;
+}
+
+.rt-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.rt-actions {
+  white-space: nowrap;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.rt-result {
+  max-width: 260px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.rt-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.rt-form-grid {
+  display: grid;
+  /* minmax(0, …): long <option> labels must not widen the columns past the modal. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 var(--space-3);
+}
+
+.rt-form-grid .field input,
+.rt-form-grid .field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.rt-form-grid .rt-wide {
+  grid-column: 1 / -1;
+}
+
+.rt-modal {
+  max-width: 640px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.rt-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.rt-checks label {
+  font-weight: 400;
+  color: var(--color-text);
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.rt-preview {
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+}
+
+.rt-preview ol {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+}
+
+.rt-form-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.rt-form-start .field {
+  margin-bottom: 0;
+}
+
+.rt-case-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  max-width: 100%;
+}
+
+.rt-row-click {
+  cursor: pointer;
+}
+
+.rt-row-click:hover td {
+  background: var(--color-surface-alt);
+}
+
+.rt-counts {
+  display: inline-flex;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.rt-ok {
+  color: var(--color-success);
+  font-weight: 600;
+}
+.rt-bad {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+.rt-warn {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+/* Drawer */
+.rt-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.4);
+  z-index: 90;
+}
+
+.rt-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(640px, 100vw);
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.rt-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.rt-drawer-head h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.rt-case {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.rt-case-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.rt-case-head strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.rt-assertions {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+}
+
+.rt-assertions li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 2px var(--space-2);
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.rt-assertions .rt-detail {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rt-output {
+  max-height: 320px;
+  overflow: auto;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .rt-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

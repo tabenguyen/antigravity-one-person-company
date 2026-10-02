@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "needs_human", "waiting_external", "failed"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "One or two sentences a human can read without opening the transcript."
+    },
+    "followUp": {
+      "type": ["object", "null"],
+      "properties": {
+        "afterHours": { "type": "number" },
+        "note": { "type": "string" }
+      },
+      "required": ["afterHours", "note"]
+    },
+    "data": {
+      "type": "object",
+      "description": "Task-kind-specific structured output, e.g. { bantScore, stage } or { draftId }."
+    }
+  },
+  "required": ["status", "summary"]
+}

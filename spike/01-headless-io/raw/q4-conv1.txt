@@ -1,0 +1,2 @@
+{"conversation_id":"caf46bd1-eb92-431d-b9a1-f4cd0317a7a7","status":"SUCCESS","response":"OK\n","duration_seconds":3.902688,"num_turns":1,"usage":{"input_tokens":12291,"output_tokens":1,"thinking_tokens":0,"cache_read_tokens":0,"total_tokens":12292}}
+EXIT=0

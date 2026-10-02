@@ -1,0 +1,2 @@
+Error: invalid --json-schema: schema is not valid JSON: invalid character 'n' looking for beginning of object key string
+EXIT=1

@@ -1,0 +1,47 @@
+{
+  "role": "sales-sdr",
+  "description": "Sales Development Representative: researches inbound/outbound leads, qualifies them against the ICP with a BANT-lite score, drafts personalized first-touch and follow-up emails, and handles replies — never sending anything directly and never inventing facts, prices, or case studies.",
+  "defaultModel": "gemini-3.8-flash-medium",
+  "policy": {
+    "builtins": ["view_file", "list_dir", "grep_search", "find_by_name", "read_url_content", "search_web", "list_resources", "read_resource"],
+    "mcp": [
+      { "server": "company", "tool": "kb_search" },
+      { "server": "company", "tool": "memory_list" },
+      { "server": "company", "tool": "memory_propose" },
+      { "server": "company", "tool": "crm_find_contact" },
+      { "server": "company", "tool": "crm_upsert_contact" },
+      { "server": "company", "tool": "crm_add_note" },
+      { "server": "company", "tool": "crm_set_stage" },
+      { "server": "company", "tool": "task_create" },
+      { "server": "company", "tool": "outbox_draft_email" }
+    ]
+  },
+  "resultSchema": "result-schema.json",
+  "taskKinds": [
+    {
+      "kind": "sdr.research_lead",
+      "description": "Research a lead/company and write a qualification summary with a BANT-lite score.",
+      "prompt": "prompts/research_lead.md"
+    },
+    {
+      "kind": "sdr.first_touch",
+      "description": "Draft a personalized first-touch outreach email to a qualified lead.",
+      "prompt": "prompts/first_touch.md"
+    },
+    {
+      "kind": "sdr.follow_up",
+      "description": "Draft the next follow-up email in a cadence for a lead who hasn't replied, or decide to stop.",
+      "prompt": "prompts/follow_up.md"
+    },
+    {
+      "kind": "sdr.handle_reply",
+      "description": "Classify an inbound reply from a lead and take the appropriate next action.",
+      "prompt": "prompts/handle_reply.md"
+    },
+    {
+      "kind": "sdr.pipeline_review",
+      "description": "Review the agent's own pipeline (scheduled routine): flag stale leads, schedule missing follow-ups, return a short summary. Drafts no emails.",
+      "prompt": "prompts/pipeline_review.md"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "spike-04-concurrency-sdk",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "concurrency": "tsx scripts/concurrency.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

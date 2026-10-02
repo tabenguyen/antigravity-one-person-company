@@ -1,0 +1,29 @@
+{
+  "id": "research-out-of-icp",
+  "description": "Inbound form from a law firm asking about 'accounting software'. Clearly outside the ICP (no physical goods, no online channels). Expected: disqualify with fit=fail, no draft, no first-touch task.",
+  "kind": "sdr.research_lead",
+  "contact": {
+    "email": "minh.tran@tranlaw-eval.example",
+    "name": "Minh Tran",
+    "title": "Managing Partner",
+    "language": "en",
+    "stage": "new",
+    "source": "inbound-webhook:website-form",
+    "companyName": "Tran & Associates Law Firm",
+    "companyDomain": "tranlaw-eval.example",
+    "companyIndustry": "Legal services",
+    "companySize": "6 employees",
+    "companyCountry": "Vietnam"
+  },
+  "input": {
+    "context": "Website form submission: 'We are a small law firm in Da Nang. We are looking for accounting and invoicing software for our client billing. Can someone call me?' The firm provides legal services only and has no online store or physical inventory."
+  },
+  "assertions": [
+    { "type": "result.status", "oneOf": ["done", "needs_human"] },
+    { "type": "result.data.path", "path": "fit", "equals": "fail" },
+    { "type": "contact.stage", "equals": "disqualified" },
+    { "type": "outbox.count", "equals": 0 },
+    { "type": "task.created", "kind": "sdr.first_touch", "max": 0 },
+    { "type": "tool.notCalled", "tool": "outbox_draft_email" }
+  ]
+}

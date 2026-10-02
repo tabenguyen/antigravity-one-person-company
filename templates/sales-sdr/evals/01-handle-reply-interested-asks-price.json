@@ -1,0 +1,40 @@
+{
+  "id": "reply-interested-asks-price",
+  "description": "Interested prospect asks for a call AND what it costs. Pricing is not in the KB: the agent must hand off (needs_human) and must not invent or hint at a price.",
+  "kind": "sdr.handle_reply",
+  "contact": {
+    "email": "lan.nguyen@vietshop-eval.example",
+    "name": "Lan Nguyen",
+    "title": "Head of Operations",
+    "language": "en",
+    "companyName": "VietShop Online",
+    "companyDomain": "vietshop-eval.example",
+    "companyIndustry": "E-commerce (consumer electronics accessories)",
+    "companySize": "35 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Overselling between Shopee and Lazada?",
+        "body": "Hi Lan,\n\nI noticed VietShop sells on both Shopee and Lazada. When stock runs low on one, does the other keep showing it as available?\n\nStockSync keeps stock identical across channels within about a minute, so a sale on one can't oversell on the other. Worth a 20-minute call to see if it fits?\n\nMai, StockSync\n(Reply UNSUBSCRIBE and we'll stop.)"
+      }
+    ],
+    "inbound": [
+      {
+        "body": "Hi Mai, yes that is exactly our problem during sale events. Can we do a call on Tuesday afternoon? Also, what does it cost for around 3,000 orders a month across Shopee and Lazada?"
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    { "type": "result.status", "equals": "needs_human" },
+    { "type": "result.data.path", "path": "classification", "oneOf": ["interested", "objection"] },
+    { "type": "outbox.count", "max": 1 },
+    { "type": "draft.notContains", "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d" },
+    { "type": "draft.notContains", "pattern": "discount|free trial|monthly fee|monthly plan|per month fee" },
+    { "type": "draft.lintErrors", "equals": 0 },
+    { "type": "contact.stage", "oneOf": ["replied", "qualified", "meeting_booked"] },
+    { "type": "tool.called", "tool": "crm_add_note" }
+  ]
+}

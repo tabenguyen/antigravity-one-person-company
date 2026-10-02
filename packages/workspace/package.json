@@ -1,0 +1,13 @@
+{
+  "name": "@agyhq/workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@agyhq/core": "*",
+    "zod": "^3.25.0"
+  }
+}

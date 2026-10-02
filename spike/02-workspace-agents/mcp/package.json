@@ -1,0 +1,19 @@
+{
+  "name": "company-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny stdio MCP server for agy-hq spike 02 (kb_search, crm_get_contact).",
+  "main": "company-mcp.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.9"
+  }
+}

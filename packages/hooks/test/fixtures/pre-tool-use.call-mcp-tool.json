@@ -1,0 +1,16 @@
+{
+  "artifactDirectoryPath": "/Users/nguyentam/.gemini/antigravity-cli/brain/d6a1f5e2-1234-4abc-9def-000000000001",
+  "conversationId": "d6a1f5e2-1234-4abc-9def-000000000001",
+  "modelName": "gemini-3.8-flash-low",
+  "stepIdx": 3,
+  "toolCall": {
+    "name": "call_mcp_tool",
+    "args": {
+      "ServerName": "company-mcp",
+      "ToolName": "kb_search",
+      "Arguments": { "query": "refund policy" }
+    }
+  },
+  "transcriptPath": "/Users/nguyentam/.gemini/antigravity-cli/brain/d6a1f5e2-1234-4abc-9def-000000000001/.system_generated/logs/transcript_full.jsonl",
+  "workspacePaths": ["/Users/nguyentam/Documents/Makini/agy-ui/spike/02-workspace-agents"]
+}

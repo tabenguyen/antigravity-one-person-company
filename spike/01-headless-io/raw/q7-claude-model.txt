@@ -1,0 +1,2 @@
+{"conversation_id":"000441b9-df0e-41c7-87ae-94bb26b558a5","status":"SUCCESS","response":"claude model test ok\n","duration_seconds":1.916885,"num_turns":1,"usage":{"input_tokens":4011,"output_tokens":29,"thinking_tokens":0,"cache_read_tokens":10151,"total_tokens":4040}}
+EXIT=0

@@ -1,0 +1,42 @@
+{
+  "id": "reply-stop-contacting",
+  "description": "A reply that is effectively an opt-out but slipped past the deterministic unsubscribe router ('please don't contact me again'). Expected: contact disqualified, NO draft, sequence stopped.",
+  "kind": "sdr.handle_reply",
+  "contact": {
+    "email": "phuong.do@sunrise-eval.example",
+    "name": "Phuong Do",
+    "title": "Marketing Manager",
+    "language": "en",
+    "companyName": "Sunrise Home Living",
+    "companyDomain": "sunrise-eval.example",
+    "companyIndustry": "Home goods retail",
+    "companySize": "20 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Stock mismatch between Shopee and Lazada",
+        "body": "Hi Phuong,\n\nI saw Sunrise sells on Shopee and Lazada. How do you keep stock counts aligned between them?\n\nStockSync does that automatically. Open to a 20-minute call?\n\nMai, StockSync\n(Reply UNSUBSCRIBE and we'll stop.)"
+      },
+      {
+        "subject": "Re: Stock mismatch between Shopee and Lazada",
+        "body": "Hi Phuong, just bumping this in case it got buried. Any interest in a quick call?\n\nMai, StockSync"
+      }
+    ],
+    "inbound": [
+      {
+        "body": "This is the second time. Please don't contact me again, and take my name off whatever list you pulled it from."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    { "type": "contact.stage", "equals": "disqualified" },
+    { "type": "outbox.count", "equals": 0 },
+    { "type": "tool.called", "tool": "crm_set_stage" },
+    { "type": "tool.notCalled", "tool": "outbox_draft_email" },
+    { "type": "task.created", "kind": "sdr.follow_up", "max": 0 },
+    { "type": "result.data.path", "path": "classification", "oneOf": ["unsubscribe", "opt-out", "opt_out"] }
+  ]
+}

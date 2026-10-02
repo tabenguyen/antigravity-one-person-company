@@ -1,0 +1,39 @@
+{
+  "id": "reply-not-now-q1",
+  "description": "Prospect says 'not a priority until Q1, ping me in January'. Expected: nurture, a follow-up task scheduled weeks out (not tomorrow), no pushy pitch.",
+  "kind": "sdr.handle_reply",
+  "contact": {
+    "email": "hung.le@freshmart-eval.example",
+    "name": "Hung Le",
+    "title": "CEO",
+    "language": "en",
+    "companyName": "FreshMart Online",
+    "companyDomain": "freshmart-eval.example",
+    "companyIndustry": "Online grocery and household goods",
+    "companySize": "60 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Keeping stock accurate on Shopee and your own site",
+        "body": "Hi Hung,\n\nFreshMart sells on Shopee and its own website. When an item sells out on one, how quickly does the other update?\n\nStockSync keeps stock in sync across channels within about a minute. Would a 20-minute intro call be useful?\n\nMai, StockSync\n(Reply UNSUBSCRIBE and we'll stop.)"
+      }
+    ],
+    "inbound": [
+      {
+        "body": "Thanks for reaching out. We have a freeze on new tools until the year-end rush is over, so this isn't a priority right now. Check back with me in Q1 (January) and we can talk then."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    { "type": "contact.stage", "equals": "nurture" },
+    { "type": "task.created", "kind": "sdr.follow_up", "min": 1, "minWakeHours": 336 },
+    { "type": "outbox.count", "max": 1 },
+    { "type": "draft.notContains", "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d" },
+    { "type": "draft.notContains", "anyOf": ["limited time", "act now", "special offer", "before it's too late"] },
+    { "type": "result.data.path", "path": "classification", "oneOf": ["not-now", "not_now", "not now", "notnow"] },
+    { "type": "tool.called", "tool": "crm_set_stage" }
+  ]
+}

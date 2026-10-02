@@ -1,0 +1,1 @@
+{"type":"object","properties":{"status":{"type":"string","enum":["ok","fail"]},"summary":{"type":"string"},"count":{"type":"integer"}},"required":["status","summary","count"]}
