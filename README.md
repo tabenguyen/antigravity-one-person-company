@@ -8,6 +8,7 @@
 ![Node 20+](https://img.shields.io/badge/node-%3E%3D20-339933)
 ![Built on Antigravity CLI](https://img.shields.io/badge/runs%20on-Antigravity%20CLI%20(agy)-4285F4)
 ![Tiếng Việt](https://img.shields.io/badge/email-ti%E1%BA%BFng%20Vi%E1%BB%87t-red)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-%E1%BB%A7ng%20h%E1%BB%99-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/tabenguyen)
 
 ---
 
@@ -164,6 +165,14 @@ npm run typecheck && npm test
 Test mặc định chạy offline (giả lập `agy` và hộp thư), không tốn quota.
 
 Quy ước commit, đánh số phiên bản và cách release: [RELEASING.md](RELEASING.md). Các thay đổi qua từng phiên bản: [CHANGELOG.md](CHANGELOG.md).
+
+## ☕ Ủng hộ
+
+Nếu dự án giúp bạn bớt được một khoản tiền API hay vài giờ trả lời email, mời mình một ly cà phê để mình có thêm động lực làm tiếp các vai trò mới:
+
+[![Ủng hộ trên Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/tabenguyen)
+
+Không ủng hộ được cũng không sao, một ⭐ cho repo hay chia sẻ cho người cần đã là giúp nhiều lắm rồi.
 
 ## English (TL;DR)
 
