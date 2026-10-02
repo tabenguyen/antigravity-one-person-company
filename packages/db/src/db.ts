@@ -17,6 +17,7 @@ import { ChannelCursorsRepo } from "./repos/channelCursors.ts";
 import { KvRepo } from "./repos/kv.ts";
 import { RoutinesRepo } from "./repos/routines.ts";
 import { EvalRunsRepo } from "./repos/evalRuns.ts";
+import { BriefingsRepo } from "./repos/briefings.ts";
 
 type SqliteDb = Database.Database;
 
@@ -38,6 +39,7 @@ export interface Db {
   kv: KvRepo;
   routines: RoutinesRepo;
   evalRuns: EvalRunsRepo;
+  briefings: BriefingsRepo;
   /** Run fn inside a single SQLite transaction; its return value is passed through. */
   transaction<T>(fn: () => T): T;
   close(): void;
@@ -72,6 +74,7 @@ export function openDb(path: string | ":memory:"): Db {
     kv: new KvRepo(sqlite),
     routines: new RoutinesRepo(sqlite),
     evalRuns: new EvalRunsRepo(sqlite),
+    briefings: new BriefingsRepo(sqlite),
     transaction<T>(fn: () => T): T {
       return sqlite.transaction(fn)();
     },

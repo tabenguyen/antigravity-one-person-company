@@ -6,6 +6,25 @@ import { REPO_ROOT } from "./helpers.ts";
 
 const TEMPLATES = path.join(REPO_ROOT, "templates");
 
+describe("shipped eval suites for every role load with the role-generic loader", () => {
+  it.each([
+    ["account-manager", 6],
+    ["chief-of-staff", 4],
+  ])("%s has at least %i valid cases with unique ids and a template for the suite's role", (role, min) => {
+    expect(listSuites(TEMPLATES)).toContain(role);
+    const suite = loadSuite(TEMPLATES, role);
+    expect(suite.cases.length).toBeGreaterThanOrEqual(min);
+    expect(new Set(suite.cases.map((c) => c.id)).size).toBe(suite.cases.length);
+    for (const c of suite.cases) {
+      expect(() => c.assertions.forEach(function walk(a: unknown): void {
+        const o = a as Record<string, unknown>;
+        for (const k of ["pattern", "notPattern"]) if (typeof o[k] === "string") new RegExp(o[k] as string, "i");
+        if (Array.isArray(o["of"])) o["of"].forEach(walk);
+      })).not.toThrow();
+    }
+  });
+});
+
 describe("shipped sales-sdr eval suite", () => {
   const suite = loadSuite(TEMPLATES, "sales-sdr");
 

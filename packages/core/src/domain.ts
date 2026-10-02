@@ -170,6 +170,7 @@ export interface MemoryItem {
 // ---------------------------------------------------------------------------
 // CRM (minimal for Sales SDR)
 
+/** Contact lifecycle stage (the name is kept from the SDR-only days). */
 export type LeadStage =
   | "new"
   | "researching"
@@ -178,7 +179,9 @@ export type LeadStage =
   | "qualified"
   | "meeting_booked"
   | "disqualified"
-  | "nurture";
+  | "nurture"
+  | "customer" // won: owned by an account manager
+  | "churned"; // customer who explicitly cancelled
 
 export interface Contact {
   id: string;
@@ -363,7 +366,9 @@ export type AuditKind =
   | "killswitch.forced"
   | "outbound.auto_paused"
   | "routine.ran"
-  | "eval.finished";
+  | "eval.finished"
+  | "contact.handoff"
+  | "briefing.created";
 
 // ---------------------------------------------------------------------------
 // Daemon settings (persisted, editable from agy-ui / CLI)
@@ -380,6 +385,10 @@ export interface HqSettings {
   autoTrip: { windowSize: number; maxBounceRate: number };
   /** Agent that receives new leads (inbound unknown senders, web forms). */
   defaultSdrAgentId: string | null;
+  /** Agent that owns a contact after a handoff ("Won -> Account Manager"), and handles customer messages. */
+  defaultAmAgentId: string | null;
+  /** Chief of Staff: triages inbound nothing else owns (`cos.triage`). */
+  defaultCosAgentId: string | null;
   /** Autonomous agents may only auto-send to contacts that already received a human-approved email. */
   autonomousRequiresPriorApproval: boolean;
 }
@@ -391,6 +400,8 @@ export const DEFAULT_SETTINGS: HqSettings = {
   sendRatePerHour: 30,
   autoTrip: { windowSize: 50, maxBounceRate: 0.05 },
   defaultSdrAgentId: null,
+  defaultAmAgentId: null,
+  defaultCosAgentId: null,
   autonomousRequiresPriorApproval: true,
 };
 
@@ -402,4 +413,18 @@ export interface AuditEvent {
   taskId: string | null;
   conversationId: string | null;
   data: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Briefings (the Chief of Staff's daily digest for the owner)
+
+export interface Briefing {
+  id: string;
+  agentId: string;
+  /** The `cos.daily_digest` task that produced it. */
+  taskId: string;
+  periodStart: Iso;
+  periodEnd: Iso;
+  markdown: string;
+  createdAt: Iso;
 }

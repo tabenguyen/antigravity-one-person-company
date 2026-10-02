@@ -11,6 +11,7 @@ export type { ListMemoryFilter } from "./repos/memory.ts";
 export type { UpsertCompanyInput, UpsertContactInput, FindContactQuery } from "./repos/crm.ts";
 export type { CreateDraftInput, ListOutboxFilter, DecidePatch, EditPatch } from "./repos/outbox.ts";
 export type { QuotaSnapshot } from "./repos/quota.ts";
+export type { CreateBriefingInput } from "./repos/briefings.ts";
 export type { CreateRoutineInput, UpdateRoutineInput } from "./repos/routines.ts";
 export { summarizeResults } from "./repos/evalRuns.ts";
 export type { CreateInboundInput, ListInboundFilter, SetStatusPatch } from "./repos/inbound.ts";

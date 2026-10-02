@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../../api/client.ts";
 import { useApi } from "../../hooks/useApi.ts";
 import { useToast } from "../../components/Toast.tsx";
@@ -11,7 +11,9 @@ const STATUSES: TaskStatus[] = ["queued", "running", "waiting_approval", "waitin
 
 export function TasksPage() {
   const { notify } = useToast();
-  const [agentId, setAgentId] = useState("");
+  const [searchParams] = useSearchParams();
+  // /tasks?agent=<id> deep-links to one agent's tasks (used by the triage decision on a task page).
+  const [agentId, setAgentId] = useState(searchParams.get("agent") ?? "");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "">("");
   const [showNewTask, setShowNewTask] = useState(false);
 

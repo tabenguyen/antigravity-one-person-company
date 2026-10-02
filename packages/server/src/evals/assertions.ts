@@ -17,6 +17,8 @@ export interface ObservedChildTask {
   title: string;
   createdAt: string;
   wakeAt: string | null;
+  /** Agent the task was assigned to (task_create `assigneeAgentId`; the case's own agent for follow-ups). */
+  assigneeAgentId?: string;
 }
 
 /** Everything an assertion may look at, captured after the task settled. */
@@ -31,7 +33,7 @@ export interface CaseObservation {
   contactEmail: string;
   /** Tool names from tool.pre audit events: MCP tool names for call_mcp_tool, built-in names otherwise. */
   toolCalls: string[];
-  /** Tasks created by the case's task (task_create or followUp). */
+  /** Tasks created by the case's task (task_create or followUp), for any agent. */
   childTasks: ObservedChildTask[];
   /** Draft attempts the daemon's lint refused (audit "outbox.lint_blocked"): error-level findings, one entry per attempt. */
   lintBlocked: { to: string; codes: string[] }[];
@@ -122,9 +124,29 @@ export function evaluateAssertion(a: EvalAssertion, obs: CaseObservation): Asser
           detail: found ? `actual: ${clip(JSON.stringify(value))}` : "path not present",
         };
       }
-      const wanted = a.oneOf ?? (a.equals !== undefined ? [a.equals] : []);
-      const name = a.oneOf ? `result.data.${a.path} in ${JSON.stringify(a.oneOf)}` : `result.data.${a.path} == ${JSON.stringify(a.equals)}`;
-      return { name, ok: found && wanted.some((w) => deepEqual(w, value)), detail: found ? `actual: ${clip(JSON.stringify(value))}` : "path not present" };
+      const checks: { label: string; ok: boolean }[] = [];
+      const text = typeof value === "string" ? value : JSON.stringify(value ?? null);
+      if (a.oneOf !== undefined || a.equals !== undefined) {
+        const wanted = a.oneOf ?? [a.equals];
+        checks.push({ label: a.oneOf ? `in ${JSON.stringify(a.oneOf)}` : `== ${JSON.stringify(a.equals)}`, ok: found && wanted.some((w) => deepEqual(w, value)) });
+      }
+      if (a.pattern !== undefined) checks.push({ label: `matches /${a.pattern}/i`, ok: found && new RegExp(a.pattern, "i").test(text) });
+      if (a.notPattern !== undefined) checks.push({ label: `does not match /${a.notPattern}/i`, ok: !found || !new RegExp(a.notPattern, "i").test(text) });
+      if (a.contains !== undefined) {
+        const needle = a.contains;
+        const ok =
+          found &&
+          (Array.isArray(value)
+            ? value.some((v) => deepEqual(v, needle) || (typeof v === "string" && typeof needle === "string" && v.toLowerCase() === needle.toLowerCase()))
+            : typeof value === "string" && typeof needle === "string" && value.toLowerCase().includes(needle.toLowerCase()));
+        checks.push({ label: `contains ${JSON.stringify(needle)}`, ok });
+      }
+      if (checks.length === 0) checks.push({ label: "(no operator given)", ok: false });
+      return {
+        name: `result.data.${a.path} ${checks.map((c) => c.label).join(" and ")}`,
+        ok: checks.every((c) => c.ok),
+        detail: found ? `actual: ${clip(JSON.stringify(value))}` : "path not present",
+      };
     }
     case "outbox.count": {
       const c = countCheck(obs.drafts.length, a);
@@ -203,6 +225,7 @@ export function evaluateAssertion(a: EvalAssertion, obs: CaseObservation): Asser
     case "task.created": {
       const matching = obs.childTasks.filter((t) => {
         if (t.kind !== a.kind) return false;
+        if (a.assigneeAgentId !== undefined && t.assigneeAgentId !== a.assigneeAgentId) return false;
         if (a.minWakeHours === undefined) return true;
         if (!t.wakeAt) return false;
         return (new Date(t.wakeAt).getTime() - new Date(t.createdAt).getTime()) / 3_600_000 >= a.minWakeHours;
@@ -211,10 +234,11 @@ export function evaluateAssertion(a: EvalAssertion, obs: CaseObservation): Asser
       // With no explicit bound, "task.created" means "at least one".
       const c = countCheck(matching.length, a.equals === undefined && a.min === undefined && a.max === undefined ? { min: 1 } : spec);
       const wake = a.minWakeHours !== undefined ? ` scheduled >= ${a.minWakeHours}h ahead` : "";
+      const who = a.assigneeAgentId !== undefined ? ` for ${a.assigneeAgentId}` : "";
       return {
-        name: `task.created ${a.kind}${wake} ${c.expect}`,
+        name: `task.created ${a.kind}${who}${wake} ${c.expect}`,
         ok: c.ok,
-        detail: `actual: ${matching.length}; tasks created: ${obs.childTasks.map((t) => t.kind).join(", ") || "none"}`,
+        detail: `actual: ${matching.length}; tasks created: ${obs.childTasks.map((t) => `${t.kind}${t.assigneeAgentId ? ` -> ${t.assigneeAgentId}` : ""}`).join(", ") || "none"}`,
       };
     }
     case "any": {

@@ -12,6 +12,7 @@ import type { Db } from "@agyhq/db";
 import { loadTemplate, renderPrompt, type Template } from "@agyhq/workspace";
 import { startRun, type RunHandle, type RunResult } from "@agyhq/runner";
 import type { AgyhqConfig } from "./config.ts";
+import { storeBriefingFromTask } from "./briefings.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { QuotaMonitor } from "./quota.ts";
 
@@ -332,6 +333,13 @@ export class Orchestrator {
     const patch = to === "failed" ? { result: structured, error: structured.summary } : { result: structured };
     db.tasks.transition(task.id, to, patch);
     bus.emit("task.transition", { taskId: task.id, agentId: agent.id, to, status: structured.status });
+
+    try {
+      storeBriefingFromTask(db, bus, task, structured);
+    } catch (err) {
+      // The digest is a by-product of a finished task; failing to store it must not undo the task's outcome.
+      bus.emit("orchestrator.error", { taskId: task.id, error: `storing briefing failed: ${(err as Error).message}` });
+    }
 
     if (structured.followUp) {
       const template = this.#loadTemplate(agent.role);

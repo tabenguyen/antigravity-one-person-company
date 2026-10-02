@@ -324,6 +324,33 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    name: "phase4_briefings_roles",
+    up(db) {
+      // contacts.stage and agents.role are plain TEXT (no CHECK): the new "customer"/"churned" stages and the
+      // account-manager / chief-of-staff roles need no schema change. Only new storage + lookup indexes here.
+      db.exec(`
+        -- The Chief of Staff's daily digests (core Briefing); one per cos.daily_digest task.
+        CREATE TABLE briefings (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL REFERENCES agents(id),
+          task_id TEXT NOT NULL,
+          period_start TEXT NOT NULL,
+          period_end TEXT NOT NULL,
+          markdown TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_briefings_created ON briefings(created_at DESC);
+        CREATE UNIQUE INDEX idx_briefings_task ON briefings(task_id);
+
+        -- Routine snapshots (account_review) and handoff/KPI queries filter contacts by owner and stage.
+        CREATE INDEX idx_contacts_owner ON contacts(owner_agent_id);
+        CREATE INDEX idx_contacts_stage ON contacts(stage);
+        CREATE INDEX idx_tasks_kind ON tasks(kind, created_at);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteDb): void {

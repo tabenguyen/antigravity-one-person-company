@@ -93,6 +93,8 @@ const LeadStageZ = z.enum([
   "meeting_booked",
   "disqualified",
   "nurture",
+  "customer",
+  "churned",
 ]);
 
 export const McpTools = {
@@ -152,6 +154,15 @@ export const McpTools = {
       afterHours: z.number().min(0).max(24 * 90).optional(),
     }),
   },
+  contact_handoff: {
+    description:
+      "Hand a won contact over to the Account Manager (they become the owner, stage -> customer, onboarding starts). Allowed from stage qualified, meeting_booked or replied. Include everything the account manager needs to know.",
+    input: z.object({
+      contactId: z.string(),
+      toRole: z.literal("account-manager"),
+      summary: z.string().trim().min(1).max(2000),
+    }),
+  },
   outbox_draft_email: {
     description:
       "Draft an outbound email. It is NOT sent: it goes to the outbox where policy and humans decide. Returns the draft and its status.",
@@ -182,6 +193,7 @@ export interface McpToolOutputs {
   crm_add_note: { note: Note };
   crm_set_stage: { contact: Contact };
   task_create: { task: Task };
+  contact_handoff: { contact: Contact; task: Task; fromAgentId: string | null; toAgentId: string };
   outbox_draft_email: { item: OutboxItem };
 }
 

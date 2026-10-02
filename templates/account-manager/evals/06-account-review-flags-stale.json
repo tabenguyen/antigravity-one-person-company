@@ -1,0 +1,81 @@
+{
+  "id": "account-review-flags-stale",
+  "description": "Routine: one customer silent for months with no open task, one silent too but already with open tasks. Expected: exactly one am.check_in task (for the first), no email drafted, the stale account listed in data.atRisk.",
+  "kind": "am.account_review",
+  "contact": {
+    "email": "tuan.dang@dongnam-eval.example",
+    "name": "Tuan Dang",
+    "title": "Owner",
+    "language": "en",
+    "companyName": "Dong Nam Sports",
+    "companyDomain": "dongnam-eval.example",
+    "companyIndustry": "E-commerce (sporting goods)",
+    "companySize": "15 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Welcome to StockSync",
+        "body": "Hi Tuan,\n\nWelcome aboard. I'm Linh, your contact at StockSync from here.\n\nLinh, StockSync"
+      }
+    ],
+    "inbound": []
+  },
+  "input": {
+    "reviewDate": "2026-10-02",
+    "staleAfterDays": 14,
+    "accounts": [
+      {
+        "name": "Tuan Dang",
+        "email": "tuan.dang@dongnam-eval.example",
+        "company": "Dong Nam Sports",
+        "stage": "customer",
+        "lastActivityAt": "2026-06-12T09:00:00.000Z",
+        "openTasks": 0
+      },
+      {
+        "contactId": "eval-no-such-contact",
+        "name": "Yen Nguyen",
+        "email": "yen.nguyen@thanhcong-eval.example",
+        "company": "Thanh Cong Fashion",
+        "stage": "customer",
+        "lastActivityAt": "2026-06-20T09:00:00.000Z",
+        "openTasks": 2
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "task.created",
+      "kind": "am.check_in",
+      "equals": 1
+    },
+    {
+      "type": "outbox.count",
+      "equals": 0
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "outbox_draft_email"
+    },
+    {
+      "type": "result.data.path",
+      "path": "atRisk",
+      "exists": true
+    },
+    {
+      "type": "result.data.path",
+      "path": "checkInsScheduled",
+      "equals": 1
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    }
+  ]
+}

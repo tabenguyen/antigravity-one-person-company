@@ -12,7 +12,7 @@ export const ROUTINE_HELP = [
   "",
   "subcommands:",
   "  list [--agent <id>]",
-  "  create --agent <id> --kind <prospecting|pipeline_review|custom_task> --name <name> --schedule '<cron>'",
+  "  create --agent <id> --kind <prospecting|pipeline_review|account_review|daily_digest|custom_task> --name <name> --schedule '<cron>'",
   "         [--tz <IANA zone, default Asia/Ho_Chi_Minh>] [--config '<json>'] [--disabled]",
   "  update <id> [--name <n>] [--schedule '<cron>'] [--tz <zone>] [--kind <k>] [--config '<json>'] [--enabled true|false]",
   "  delete <id>",
@@ -24,6 +24,8 @@ export const ROUTINE_HELP = [
   "config by kind:",
   "  prospecting      {\"batchSize\":5,\"stages\":[\"new\"]}   research the next N uncontacted leads (max 25)",
   "  pipeline_review  {}                                 daily pipeline summary + missing follow-ups",
+  "  account_review   {\"maxAccounts\":40,\"staleAfterDays\":14}   account manager: review customer accounts, flag at-risk, schedule check-ins",
+  "  daily_digest     {\"lookbackHours\":24}                chief of staff: the owner's daily brief (see `hq briefings`)",
   "  custom_task      {\"kind\":\"sdr.follow_up\",\"title\":\"...\",\"input\":{}}   create this task each time",
 ].join("\n");
 
@@ -31,7 +33,7 @@ export const EVAL_HELP = [
   "usage: hq eval <subcommand> [args]",
   "",
   "subcommands:",
-  "  run [--suite sales-sdr] [--case <id> ...] [--model <model-id>] [--wait]",
+  "  run [--suite sales-sdr|account-manager|chief-of-staff] [--case <id> ...] [--model <model-id>] [--wait]",
   "        start a regression run (real model runs: costs quota; cases run one at a time).",
   "        --wait follows the run and prints the results table (exit code 1 if any case is not 'pass').",
   "  list [--suite <name>] [--limit <n>]",
@@ -39,7 +41,7 @@ export const EVAL_HELP = [
   "  suites                     available suites and their case ids",
 ].join("\n");
 
-const ROUTINE_KINDS: RoutineKind[] = ["prospecting", "pipeline_review", "custom_task"];
+const ROUTINE_KINDS: RoutineKind[] = ["prospecting", "pipeline_review", "account_review", "daily_digest", "custom_task"];
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested)

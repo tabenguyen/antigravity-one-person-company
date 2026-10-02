@@ -13,6 +13,8 @@ export const LEAD_STAGES = [
   "meeting_booked",
   "disqualified",
   "nurture",
+  "customer",
+  "churned",
 ] as const satisfies readonly LeadStage[];
 
 export const MAX_BATCH_SIZE = 25;
@@ -35,6 +37,23 @@ export const PipelineReviewConfigZ = z
   .strict();
 export type PipelineReviewConfig = z.infer<typeof PipelineReviewConfigZ>;
 
+export const AccountReviewConfigZ = z
+  .object({
+    /** Customer accounts listed in the snapshot handed to the agent (most stale first). */
+    maxAccounts: z.number().int().min(1).max(200).default(40),
+    staleAfterDays: z.number().int().min(1).max(180).default(14),
+  })
+  .strict();
+export type AccountReviewConfig = z.infer<typeof AccountReviewConfigZ>;
+
+export const DailyDigestConfigZ = z
+  .object({
+    /** How far back the digest looks. */
+    lookbackHours: z.number().int().min(1).max(168).default(24),
+  })
+  .strict();
+export type DailyDigestConfig = z.infer<typeof DailyDigestConfigZ>;
+
 export const CustomTaskConfigZ = z
   .object({
     kind: z.string().min(1).max(100),
@@ -50,9 +69,24 @@ function zodMessage(err: z.ZodError): string {
   return err.issues.map((i) => `${i.path.join(".") || "(config)"}: ${i.message}`).join("; ");
 }
 
+const ROUTINE_CONFIG_SCHEMAS: Record<RoutineKind, z.ZodTypeAny> = {
+  prospecting: ProspectingConfigZ,
+  pipeline_review: PipelineReviewConfigZ,
+  account_review: AccountReviewConfigZ,
+  daily_digest: DailyDigestConfigZ,
+  custom_task: CustomTaskConfigZ,
+};
+
+/** Task kind a routine kind creates each run (custom_task names its own); the agent's template must define it. */
+export const ROUTINE_TASK_KIND: Partial<Record<RoutineKind, string>> = {
+  pipeline_review: "sdr.pipeline_review",
+  account_review: "am.account_review",
+  daily_digest: "cos.daily_digest",
+};
+
 /** Validate + normalize (apply defaults to) a routine's config; throws ValidationError with a readable message. */
 export function parseRoutineConfig(kind: RoutineKind, config: Record<string, unknown>): Record<string, unknown> {
-  const schema = kind === "prospecting" ? ProspectingConfigZ : kind === "pipeline_review" ? PipelineReviewConfigZ : CustomTaskConfigZ;
+  const schema = ROUTINE_CONFIG_SCHEMAS[kind];
   const parsed = schema.safeParse(config);
   if (!parsed.success) throw new ValidationError(`invalid ${kind} config: ${zodMessage(parsed.error)}`);
   return parsed.data as Record<string, unknown>;

@@ -54,3 +54,10 @@ Recommendation: book-demo | nurture | disqualify
 
 Always `crm_set_stage` and `crm_add_note` with the score and reasoning —
 the score without a reason is not useful to the next person.
+
+## When the prospect says yes
+
+If, during qualification, a prospect explicitly confirms they're buying or
+signing up, qualification is over: don't score or nurture them. Hand them to
+the Account Manager with `contact_handoff({ contactId, toRole:
+"account-manager", summary })` — see the `won` row in `handle-reply`.

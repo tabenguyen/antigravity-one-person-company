@@ -25,6 +25,17 @@ export const TaskKindSpecZ = z.object({
 });
 export type TaskKindSpec = z.infer<typeof TaskKindSpecZ>;
 
+/**
+ * How inbound mail reaches a role that owns contacts. A reply from a contact owned by an agent of this role becomes
+ * a `replyKind` task for that agent; the role's `followUpKinds` are cancelled on the thread when the contact answers
+ * or is handed to someone else. Roles that never own contacts (chief-of-staff) omit it.
+ */
+export const TemplateRoutingZ = z.object({
+  replyKind: z.string().min(1),
+  followUpKinds: z.array(z.string().min(1)).default([]),
+});
+export type TemplateRouting = z.infer<typeof TemplateRoutingZ>;
+
 export const TemplateJsonZ = z.object({
   role: z.string().min(1),
   description: z.string().min(1),
@@ -34,6 +45,7 @@ export const TemplateJsonZ = z.object({
   /** Path to a JSON Schema file, relative to the template directory. */
   resultSchema: z.string().min(1),
   taskKinds: z.array(TaskKindSpecZ).min(1),
+  routing: TemplateRoutingZ.optional(),
 });
 export type TemplateJson = z.infer<typeof TemplateJsonZ>;
 
@@ -44,6 +56,8 @@ export interface Template {
   defaultModel: string;
   policy: ToolPolicy;
   taskKinds: TaskKindSpec[];
+  /** Inbound routing for roles that own contacts; null when the template declares none. */
+  routing: TemplateRouting | null;
   /** Absolute path to templates/<role>/. */
   templateDir: string;
   /** Absolute path to the result-schema.json file. */

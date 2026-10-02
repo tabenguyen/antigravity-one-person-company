@@ -1,0 +1,70 @@
+{
+  "id": "triage-newsletter-no-action",
+  "description": "A marketplace newsletter with no request. Expected: no_action with a reason, no task created.",
+  "kind": "cos.triage",
+  "contact": {
+    "email": "news@marketplace-eval.example",
+    "name": "Marketplace Weekly",
+    "language": "en",
+    "source": "inbound-email",
+    "companyName": "Marketplace",
+    "companyDomain": "marketplace-eval.example"
+  },
+  "input": {
+    "inboundEventId": "evt-eval-005",
+    "fromAddress": "news@marketplace-eval.example",
+    "fromName": "Marketplace Weekly",
+    "subject": "This week's seller tips and campaign calendar",
+    "body": "Hello seller! Your weekly digest: campaign calendar for next month, three tips for better listing photos, and a reminder that our webinar is on Thursday. Unsubscribe at any time.",
+    "classification": "other",
+    "roster": [
+      {
+        "agentId": "eval-sdr",
+        "role": "sales-sdr",
+        "displayName": "Mai",
+        "kinds": [
+          "sdr.research_lead",
+          "sdr.first_touch",
+          "sdr.follow_up",
+          "sdr.handle_reply",
+          "sdr.pipeline_review"
+        ]
+      },
+      {
+        "agentId": "eval-am",
+        "role": "account-manager",
+        "displayName": "Linh",
+        "kinds": [
+          "am.onboard",
+          "am.handle_message",
+          "am.check_in",
+          "am.account_review"
+        ]
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "result.data.path",
+      "path": "decision.action",
+      "equals": "no_action"
+    },
+    {
+      "type": "result.data.path",
+      "path": "decision.reason",
+      "exists": true
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "task_create"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 0
+    }
+  ]
+}

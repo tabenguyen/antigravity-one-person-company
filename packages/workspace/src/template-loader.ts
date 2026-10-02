@@ -53,6 +53,15 @@ export function loadTemplate(templatesRoot: string, role: string): Template {
     }
   }
 
+  if (parsed.routing) {
+    const kinds = new Set(parsed.taskKinds.map((tk) => tk.kind));
+    for (const k of [parsed.routing.replyKind, ...parsed.routing.followUpKinds]) {
+      if (!kinds.has(k)) {
+        throw new Error(`template.json "routing" for role "${role}" names task kind "${k}", which is not in taskKinds`);
+      }
+    }
+  }
+
   const rulesDir = path.join(templateDir, "rules");
   const skillsDir = path.join(templateDir, "skills");
   const kbDir = path.join(templateDir, "kb");
@@ -63,6 +72,7 @@ export function loadTemplate(templatesRoot: string, role: string): Template {
     defaultModel: parsed.defaultModel,
     policy: parsed.policy,
     taskKinds: parsed.taskKinds,
+    routing: parsed.routing ?? null,
     templateDir,
     resultSchemaPath,
     resultSchema,

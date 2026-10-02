@@ -38,6 +38,7 @@ export type {
   ApiEnvelope,
   ApiErrorCode,
   ContactView,
+  Briefing,
 } from "@agyhq/core";
 
 export type {
@@ -64,4 +65,10 @@ export type {
   TimelineEntry,
   TranscriptStep,
   SseEventType,
+  HandoffContactRequest,
+  KpiReport,
+  SdrKpis,
+  AmKpis,
+  CosKpis,
+  CommonKpis,
 } from "@agyhq/server";

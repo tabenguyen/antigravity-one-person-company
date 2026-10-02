@@ -223,7 +223,7 @@ from the model's head.
 - Sales SDR, real inbox, nothing auto-sent.
 - Measure edit/approve rate for 2 weeks, then promote to `assisted`.
 
-**Phase 4 — More roles + coordination**
+**Phase 4 — More roles + coordination** ✅ built 2026-10-03 — see [PHASE4.md](PHASE4.md): Account Manager + Chief of Staff roles, SDR→AM handoff, role-aware routing, account_review / daily_digest routines, briefings, per-role KPIs; real-agy evals AM 8/8, CoS 6/6 (SLA-bait case occasionally flaky). Marketer deferred (needs publishing channels).
 - Remaining roles, Chief-of-Staff triage, handoffs, recurring routines,
   per-role KPIs, evals.
 

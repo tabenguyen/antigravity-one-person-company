@@ -35,6 +35,8 @@ export interface AgentApiDeps {
   attachmentsRoot?: string;
   /** Valid task kinds for an agent (from its role template); null = don't validate. Used by task_create. */
   taskKindsFor?: (agent: Agent) => readonly string[] | null;
+  /** Follow-up kinds of an agent's role (template `routing.followUpKinds`); cancelled on a contact handoff. Default: sdr.follow_up. */
+  followUpKindsFor?: (agent: Agent | null) => readonly string[];
 }
 
 /** Builds the Hono app serving /v1/hooks/* and /v1/mcp/*. See the package README for the route list. */

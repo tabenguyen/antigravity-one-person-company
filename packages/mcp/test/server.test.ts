@@ -22,6 +22,7 @@ const VALID_INPUT: { [N in McpToolName]: unknown } = {
   crm_add_note: { contactId: "contact_1", body: "Called, left voicemail." },
   crm_set_stage: { contactId: "contact_1", stage: "qualified", reason: "Confirmed budget and timeline." },
   task_create: { kind: "sdr.follow_up", title: "Follow up with Jane", input: { note: "in 3 days" } },
+  contact_handoff: { contactId: "contact_1", toRole: "account-manager", summary: "Signed the order form; wants onboarding next week." },
   outbox_draft_email: {
     to: "jane@acme.com",
     subject: "Following up",

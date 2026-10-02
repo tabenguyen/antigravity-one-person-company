@@ -7,6 +7,7 @@ import { useToast } from "../../components/Toast.tsx";
 import { formatDateTime } from "../../lib/time.ts";
 import { eventHub, type HubEvent } from "../../api/sse.ts";
 import type { Task, TaskStatus } from "../../api/types.ts";
+import { TaskInsights } from "./TaskInsights.tsx";
 
 const FINISHED: TaskStatus[] = ["done", "failed", "cancelled"];
 
@@ -15,6 +16,7 @@ export function TaskDetailPage() {
   const { notify } = useToast();
   const { data, loading, error, refresh } = useApi(() => api.getTask(id), [id], ["task.transition"]);
   const { data: transcript } = useApi(() => api.taskTranscript(id), [id, data?.task.status]);
+  const { data: agentsData } = useApi(() => api.listAgents(), []);
   const [liveEvents, setLiveEvents] = useState<HubEvent[]>([]);
 
   const task = data?.task;
@@ -83,6 +85,8 @@ export function TaskDetailPage() {
       </div>
 
       {task.error && <div className="banner banner-danger">{task.error}</div>}
+
+      <TaskInsights task={task} agents={agentsData?.agents ?? []} />
 
       {task.status === "waiting_approval" && <DecisionPanel task={task} onResolved={refresh} />}
       {FINISHED.includes(task.status) && <FollowUpPanel task={task} />}

@@ -7,13 +7,13 @@
 import { createAgentApi, RunTokenRegistry } from "./agent-api/index.ts";
 
 import { Hono } from "hono";
-import { loadTemplate } from "@agyhq/workspace";
 import type { EmailProvider } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
 import type { AgyhqConfig } from "./config.ts";
 import { EventBus } from "./event-bus.ts";
 import { createAdminApi } from "./admin-api.ts";
 import { attachmentsRoot } from "./attachments.ts";
+import { roleRouting, roleTaskKinds } from "./routing.ts";
 import { Orchestrator } from "./orchestrator.ts";
 import { QuotaMonitor } from "./quota.ts";
 import { EmailPoller } from "./inbound.ts";
@@ -81,13 +81,8 @@ export function buildApp(config: AgyhqConfig, db: Db): AppHandle {
       outboxDailyLimit: config.outboxDailyLimit,
       attachmentsRoot: attachmentsRoot(config.dataDir),
       emit: (t, d) => bus.emit(t, d),
-      taskKindsFor: (agent) => {
-        try {
-          return loadTemplate(config.templatesRoot, agent.role).taskKinds.map((k) => k.kind);
-        } catch {
-          return null;
-        }
-      },
+      taskKindsFor: (agent) => roleTaskKinds(config, agent.role),
+      followUpKindsFor: (agent) => roleRouting(config, agent?.role ?? "sales-sdr")?.followUpKinds ?? [config.routing.followUpKind],
     }),
   );
   app.use("/*", createUiStaticMiddleware(config.uiDist));

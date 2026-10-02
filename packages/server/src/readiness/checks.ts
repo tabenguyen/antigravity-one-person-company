@@ -67,10 +67,12 @@ function kbChecks(deps: ReadinessDeps): ReadinessCheck[] {
           "/setup#company",
         );
 
+  // A role's starter KB is only a risk once an agent of that role is working: roles nobody runs may keep TODO sections.
+  const activeRoles = new Set(db.agents.list({ status: "active" }).map((a) => `role:${a.role}`));
   const offenders: string[] = [];
   let offenderCount = 0;
   for (const doc of docs) {
-    if (doc.scope !== "company" && !doc.scope.startsWith("role:")) continue;
+    if (doc.scope !== "company" && !activeRoles.has(doc.scope)) continue;
     const hit = findPlaceholder(doc.body);
     if (!hit) continue;
     offenderCount++;
@@ -190,11 +192,14 @@ function agentChecks(deps: ReadinessDeps): ReadinessCheck[] {
   const settings = db.settings.get();
   const agents = db.agents.list();
   const sdrs = agents.filter((a) => a.role === "sales-sdr" && a.status === "active");
+  const ams = agents.filter((a) => a.role === "account-manager" && a.status === "active");
 
   const present =
     sdrs.length > 0
       ? check("agents.sdr_present", "Active Sales SDR agent", "pass", `Active: ${sdrs.map((a) => a.id).join(", ")}.`, "/agents")
-      : check("agents.sdr_present", "Active Sales SDR agent", "fail", "No active sales-sdr agent. Create one on the Agents page (start in shadow tier).", "/agents");
+      : ams.length > 0 // an account-manager-only setup (no outbound prospecting) is a valid way to start
+        ? check("agents.sdr_present", "Active Sales SDR agent", "warn", `No active sales-sdr agent; only account manager(s) ${ams.map((a) => a.id).join(", ")} can draft email.`, "/agents")
+        : check("agents.sdr_present", "Active Sales SDR agent", "fail", "No active sales-sdr agent. Create one on the Agents page (start in shadow tier).", "/agents");
 
   const autonomous = agents.filter((a) => a.trustTier === "autonomous");
   const trust =
@@ -217,7 +222,25 @@ function agentChecks(deps: ReadinessDeps): ReadinessCheck[] {
   } else {
     defaultSdr = check("settings.default_sdr", "Default SDR for new leads", "pass", `New leads go to ${defaultId}.`, "/settings");
   }
-  return [present, trust, defaultSdr];
+  const checks = [present, trust, defaultSdr];
+
+  // Phase 4 roles: only mentioned once they are in use (or a stale default points at nothing).
+  for (const spec of [
+    { key: "defaultAmAgentId", role: "account-manager", id: "settings.default_am", title: "Default Account Manager for won deals", what: "handoffs (Won -> Account Manager) and customer messages" },
+    { key: "defaultCosAgentId", role: "chief-of-staff", id: "settings.default_cos", title: "Default Chief of Staff for triage", what: "inbound mail nobody owns" },
+  ] as const) {
+    const roleAgents = agents.filter((a) => a.role === spec.role && a.status === "active");
+    const configured = settings[spec.key];
+    const current = configured ? agents.find((a) => a.id === configured) : null;
+    if (configured && (!current || current.status !== "active")) {
+      checks.push(check(spec.id, spec.title, "warn", `${spec.key} "${configured}" is not an active ${spec.role} agent. Choose another in Settings.`, "/settings"));
+    } else if (!configured && roleAgents.length > 0) {
+      checks.push(check(spec.id, spec.title, "warn", `${roleAgents.map((a) => a.id).join(", ")} exists but no default is set, so ${spec.what} have no owner. Choose one in Settings.`, "/settings"));
+    } else if (configured) {
+      checks.push(check(spec.id, spec.title, "pass", `${configured} handles ${spec.what}.`, "/settings"));
+    }
+  }
+  return checks;
 }
 
 function settingsChecks(deps: ReadinessDeps): ReadinessCheck[] {

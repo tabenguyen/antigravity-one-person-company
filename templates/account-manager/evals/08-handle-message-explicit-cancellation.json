@@ -1,0 +1,64 @@
+{
+  "id": "message-explicit-cancellation",
+  "description": "Customer explicitly says they are cancelling at the end of the month. Expected: escalate (needs_human), mark the contact churned via crm_set_stage, no retention offer (no discount/free months), no promise about the outcome.",
+  "kind": "am.handle_message",
+  "contact": {
+    "email": "phuc.ngo@vanlang-eval.example",
+    "name": "Phuc Ngo",
+    "language": "en",
+    "companyName": "Van Lang Books",
+    "companyDomain": "vanlang-eval.example",
+    "companyIndustry": "E-commerce (books)",
+    "companySize": "6 employees",
+    "companyCountry": "Vietnam"
+  },
+  "thread": {
+    "sent": [
+      {
+        "subject": "Welcome to StockSync",
+        "body": "Hi Phuc,\n\nWelcome aboard. I'm Linh, your contact at StockSync from here.\n\nLinh, StockSync"
+      }
+    ],
+    "inbound": [
+      {
+        "subject": "Cancelling",
+        "body": "Hi Linh, we have decided to stop using StockSync. We are moving everything onto a single channel so we don't need it. Please cancel our account at the end of this month."
+      }
+    ]
+  },
+  "input": {},
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "needs_human"
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_set_stage"
+    },
+    {
+      "type": "tool.called",
+      "tool": "crm_add_note"
+    },
+    {
+      "type": "outbox.count",
+      "max": 1
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "discount|free (month|period|trial)|giảm giá|miễn phí|special (offer|price)|ưu đãi"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "(will|'ll) (be )?(cancel(l)?ed|processed)|has been (cancel(l)?ed|processed)|đã (hủy|huỷ)|sẽ (được )?(hủy|huỷ)"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\$\\s?\\d|\\d[\\d.,]*\\s?(usd|vnd|vnđ|₫|triệu|nghìn)|\\b(usd|vnd)\\s?\\d"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

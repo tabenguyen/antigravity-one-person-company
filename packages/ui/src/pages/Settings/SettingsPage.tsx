@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../../api/client.ts";
 import { useApi } from "../../hooks/useApi.ts";
 import { useToast } from "../../components/Toast.tsx";
+import type { Agent, AgentRole } from "../../api/types.ts";
+import { roleLabel } from "../../lib/roles.ts";
 
 export function SettingsPage() {
   const { notify } = useToast();
@@ -17,6 +19,8 @@ export function SettingsPage() {
   const [windowSize, setWindowSize] = useState("50");
   const [maxBounceRate, setMaxBounceRate] = useState("5");
   const [defaultSdrAgentId, setDefaultSdrAgentId] = useState("");
+  const [defaultAmAgentId, setDefaultAmAgentId] = useState("");
+  const [defaultCosAgentId, setDefaultCosAgentId] = useState("");
   const [autonomousRequiresPriorApproval, setAutonomousRequiresPriorApproval] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,6 +36,8 @@ export function SettingsPage() {
     setWindowSize(String(s.autoTrip.windowSize));
     setMaxBounceRate(String(Math.round(s.autoTrip.maxBounceRate * 100)));
     setDefaultSdrAgentId(s.defaultSdrAgentId ?? "");
+    setDefaultAmAgentId(s.defaultAmAgentId ?? "");
+    setDefaultCosAgentId(s.defaultCosAgentId ?? "");
     setAutonomousRequiresPriorApproval(s.autonomousRequiresPriorApproval);
   }, [data]);
 
@@ -65,6 +71,8 @@ export function SettingsPage() {
         sendRatePerHour: Number(sendRate),
         autoTrip: { windowSize: Number(windowSize), maxBounceRate: Number(maxBounceRate) / 100 },
         defaultSdrAgentId: defaultSdrAgentId || null,
+        defaultAmAgentId: defaultAmAgentId || null,
+        defaultCosAgentId: defaultCosAgentId || null,
         autonomousRequiresPriorApproval,
       });
       notify("Settings saved.", "success");
@@ -144,6 +152,24 @@ export function SettingsPage() {
               ))}
           </select>
         </div>
+        <RoleAgentSelect
+          id="default-am"
+          label="Default Account Manager (customers after a handoff)"
+          hint="Receives contacts handed off from the SDR and answers customer messages. Required for the “Hand off to Account Manager” button."
+          role="account-manager"
+          value={defaultAmAgentId}
+          onChange={setDefaultAmAgentId}
+          agents={agentsData?.agents}
+        />
+        <RoleAgentSelect
+          id="default-cos"
+          label="Default Chief of Staff (triage + daily briefing)"
+          hint="Triages inbound mail no other agent owns. Without one, unroutable mail stays in Inbound."
+          role="chief-of-staff"
+          value={defaultCosAgentId}
+          onChange={setDefaultCosAgentId}
+          agents={agentsData?.agents}
+        />
         <div className="field">
           <label>
             <input
@@ -160,6 +186,44 @@ export function SettingsPage() {
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+    </div>
+  );
+}
+
+/** Select limited to active agents of one role, plus "(none)". A saved value that is no longer eligible stays visible so it can be fixed. */
+function RoleAgentSelect({
+  id,
+  label,
+  hint,
+  role,
+  value,
+  onChange,
+  agents,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  role: AgentRole;
+  value: string;
+  onChange: (v: string) => void;
+  agents: Agent[] | undefined;
+}) {
+  const eligible = (agents ?? []).filter((a) => a.role === role && a.status === "active");
+  const stale = value && !eligible.some((a) => a.id === value);
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">(none)</option>
+        {stale && <option value={value}>{value} (not an active {roleLabel(role)})</option>}
+        {eligible.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.displayName} ({a.id})
+          </option>
+        ))}
+      </select>
+      {eligible.length === 0 && !stale && <span className="faint">No active {roleLabel(role)} agent yet — create one on the Agents page.</span>}
+      <span className="faint">{hint}</span>
     </div>
   );
 }

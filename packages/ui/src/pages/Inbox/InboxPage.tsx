@@ -1,3 +1,4 @@
+import { StageBadge } from "../../components/StageBadge.tsx";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../../api/client.ts";
@@ -448,7 +449,7 @@ function InboxDetail({
 
       {contact && (
         <div className="context-panel">
-          <strong>Contact:</strong> {contact.name ?? contact.email} · stage: {contact.stage}
+          <strong>Contact:</strong> {contact.name ?? contact.email} · stage: <StageBadge stage={contact.stage} />
           {contact.company && <> · {contact.company.name}</>}
           {timeline.length > 0 && (
             <div className="timeline" style={{ marginTop: 8 }}>

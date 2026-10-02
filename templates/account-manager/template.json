@@ -1,21 +1,42 @@
 {
   "role": "account-manager",
-  "description": "Account Manager / Customer Success stub — full content (rules, skills, prompts, KB) comes later. Present so the template loader and renderer can be exercised against a second role.",
+  "description": "Account Manager / Customer Success: onboards new customers after a sales handoff, answers customer questions from the knowledge base (tier-1 support), runs proactive check-ins and a periodic account review. Never sends anything directly, never invents facts, and never promises refunds, discounts, credits, SLA/uptime, delivery dates or contract changes — those go to a human.",
   "defaultModel": "gemini-3.8-flash-medium",
   "policy": {
-    "builtins": ["view_file", "list_dir", "grep_search", "find_by_name"],
+    "builtins": ["view_file", "list_dir", "grep_search", "find_by_name", "list_resources", "read_resource"],
     "mcp": [
       { "server": "company", "tool": "kb_search" },
+      { "server": "company", "tool": "memory_list" },
+      { "server": "company", "tool": "memory_propose" },
       { "server": "company", "tool": "crm_find_contact" },
-      { "server": "company", "tool": "crm_add_note" }
+      { "server": "company", "tool": "crm_add_note" },
+      { "server": "company", "tool": "crm_set_stage" },
+      { "server": "company", "tool": "task_create" },
+      { "server": "company", "tool": "outbox_draft_email" }
     ]
   },
+  "routing": { "replyKind": "am.handle_message", "followUpKinds": ["am.check_in"] },
   "resultSchema": "result-schema.json",
   "taskKinds": [
     {
-      "kind": "am.placeholder",
-      "description": "Placeholder task kind — replace once Account Manager content is built out.",
-      "prompt": "prompts/placeholder.md"
+      "kind": "am.onboard",
+      "description": "A deal was handed off to you: read the handoff, draft one welcome/onboarding email to the new customer, and note it on the contact.",
+      "prompt": "prompts/onboard.md"
+    },
+    {
+      "kind": "am.handle_message",
+      "description": "Answer an inbound message from an existing customer from the knowledge base (tier-1 support); escalate refunds, discounts, price/contract changes, SLA promises, bug or feature dates and cancellations to a human.",
+      "prompt": "prompts/handle_message.md"
+    },
+    {
+      "kind": "am.check_in",
+      "description": "Proactive check-in (adoption or renewal): draft one short email to a customer, or decide not to and say why.",
+      "prompt": "prompts/check_in.md"
+    },
+    {
+      "kind": "am.account_review",
+      "description": "Review your own customer accounts (scheduled routine): flag at-risk accounts, schedule check-ins for stale ones, return a short summary. Drafts no emails.",
+      "prompt": "prompts/account_review.md"
     }
   ]
 }

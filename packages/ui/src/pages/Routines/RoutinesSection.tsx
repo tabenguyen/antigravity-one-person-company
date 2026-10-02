@@ -148,7 +148,7 @@ export function RoutinesSection() {
             {data && data.routines.length === 0 && (
               <tr>
                 <td colSpan={7} className="empty-state">
-                  No routines yet. Create one so your SDR prospects automatically.
+                  No routines yet. Create one so your SDR prospects automatically, your Account Manager reviews customer accounts, or your Chief of Staff writes a daily briefing.
                 </td>
               </tr>
             )}

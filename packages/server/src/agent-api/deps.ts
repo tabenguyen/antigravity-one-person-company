@@ -15,6 +15,7 @@ export interface ResolvedDeps {
   agyStateDir: string;
   attachmentsRoot: string | null;
   taskKindsFor: (agent: Agent) => readonly string[] | null;
+  followUpKindsFor: (agent: Agent | null) => readonly string[];
 }
 
 export function resolveDeps(deps: AgentApiDeps): ResolvedDeps {
@@ -27,5 +28,6 @@ export function resolveDeps(deps: AgentApiDeps): ResolvedDeps {
     agyStateDir: deps.agyStateDir ?? path.join(os.homedir(), ".gemini", "antigravity-cli"),
     attachmentsRoot: deps.attachmentsRoot ?? null,
     taskKindsFor: deps.taskKindsFor ?? (() => null),
+    followUpKindsFor: deps.followUpKindsFor ?? (() => ["sdr.follow_up"]),
   };
 }
