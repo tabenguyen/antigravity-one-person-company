@@ -230,6 +230,27 @@ from the model's head.
 **Phase 5 — Hardening**
 - Postgres, multi-tenant (several companies), packaging roles as agy plugins.
 
+**Known issues (fix later)** — found by the Phase 4 real-agy eval runs, 2026-10-03
+- [ ] SDR evals 6/8 (pre-existing, also fail before Phase 4):
+  `research-out-of-icp-answers-question` drafts "Re: …" with no prior thread →
+  refused by `deceptive_subject` lint; `first-touch-good-fit` about half the
+  runs proposes a fixed "15-minute call, I'm free Tuesday" CTA.
+- [ ] Duplicate drafts: `outbox_draft_email` stores a draft that has only lint
+  warnings, the agent sees the warning and drafts again → two drafts in the
+  approval queue. Fixed in the AM template only; SDR still exposed. Better fix
+  is server-side (e.g. one pending draft per task/thread, or return warnings
+  without storing).
+- [ ] AM lint false positive: `quality/am-lint.ts` scans the subject, so
+  "Re: <customer subject containing refund / uptime guarantee>" is refused.
+  Lint only text the agent wrote, not the echoed subject. (The AM template
+  works around it with neutral subjects; `message-sla-uptime-bait` is still
+  occasionally flaky.)
+- [ ] Small API gaps the UI works around: `GET /v1/admin/audit` has no
+  `contactId` filter; `GET /v1/admin/contacts` has no stage filter (UI filters
+  the latest 200 client-side).
+- [ ] Eval runs against real agy have no npm script / CLI entry for non-SDR
+  suites; `draft.lintErrors` only supports `equals` (no `max`).
+
 ---
 
 ## 7. Risks & open questions
