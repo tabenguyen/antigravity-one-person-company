@@ -1,5 +1,6 @@
 {
-  "name": "agy-hq",
+  "name": "antigravity-one-person-company",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -12,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/ui/tsconfig.json",
     "test": "vitest run",
     "build": "npm run build --workspaces --if-present",
-    "hq": "tsx packages/cli/src/main.ts"
+    "hq": "tsx packages/cli/src/main.ts",
+    "release:notes": "node scripts/release-notes.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

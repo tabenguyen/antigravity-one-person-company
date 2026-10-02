@@ -163,6 +163,8 @@ npm run typecheck && npm test
 
 Test mặc định chạy offline (giả lập `agy` và hộp thư), không tốn quota.
 
+Quy ước commit, đánh số phiên bản và cách release: [RELEASING.md](RELEASING.md). Các thay đổi qua từng phiên bản: [CHANGELOG.md](CHANGELOG.md).
+
 ## English (TL;DR)
 
 **antigravity-one-person-company** turns the Antigravity CLI (`agy`) you're already logged into into background AI staff — starting with a Sales SDR that researches leads, drafts outreach and replies (Vietnamese or English), and follows up, with a human-approval inbox, kill switch, forbidden-claims lint and trust tiers (shadow → assisted → autonomous). It spawns `agy` headlessly, so it runs on your existing Google account quota: **no API keys, no per-token bill.** TypeScript, SQLite, React UI. See [`docs/TECHNICAL.md`](docs/TECHNICAL.md).
