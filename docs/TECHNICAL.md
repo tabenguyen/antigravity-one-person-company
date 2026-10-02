@@ -74,6 +74,9 @@ isn't built yet):
 }
 ```
 
+Real-mailbox specifics (read-only access, first-sync policy `initialSyncDays`, opt-in Sent-folder sync `syncSent`,
+`hq email doctor`, provider notes in Vietnamese): [`docs/EMAIL-SETUP.md`](EMAIL-SETUP.md).
+
 For `imap-smtp`, **don't put real passwords in the config file** — set
 `AGYHQ_IMAP_PASS` / `AGYHQ_SMTP_PASS` env vars instead; they override
 whatever `imap.pass` / `smtp.pass` the file has.
@@ -248,6 +251,30 @@ Contract and definitions: [`docs/PHASE4.md`](PHASE4.md). Summary of what the dae
 - **UI** (`packages/ui`): role picker in New agent; default AM / CoS in Settings; contact page with owner, stage badge, "Hand off to Account Manager" and handoff history (`contact.handoff` audit rows, notes as fallback); Briefings page (`/briefings`); per-role KPI cards on the Dashboard (7/30 days, `—` for null rates); `account_review` / `daily_digest` in the routine form; structured `cos.triage` decision / `am.*` notes on the task page.
 - **CLI**: `hq kpis [--days n]`, `hq briefings [list|show <id>]`,
   `hq contact handoff <id> [--summary ...]`, `hq routine create --kind account_review|daily_digest`.
+
+## Shadow run (evaluation period)
+
+Runbook for the human: [`docs/SHADOW-RUN.md`](SHADOW-RUN.md). A shadow run is a stored window (`shadow_runs`: `startedAt`, `plannedDays`
+default 14, `agentIds`, `notes`, `endedAt`; one active at a time) over shadow-tier agents. Everything else is computed on read
+(`packages/server/src/shadow.ts`) from outbox/audit, reusing `quality/scorecard.ts` (`computeScorecardWindow`, `checkCriteria`) so the verdict
+can never disagree with promotion eligibility.
+
+- **API**: `GET /v1/admin/shadow` (active status, last finished status, history, agents a run could cover), `GET /v1/admin/shadow/:id`,
+  `POST /v1/admin/shadow {plannedDays?, agentIds?, notes?}` (400 for a non-shadow agent or none to evaluate, 409 if one is active),
+  `POST /v1/admin/shadow/:id/end {notes?}`. Audit `shadow.started` / `shadow.ended`, SSE `shadow.updated`. Types: "Shadow run" block in `admin-types.ts`.
+- **CLI**: `hq shadow start [--days n] [--agents a,b] [--notes t]`, `hq shadow status [--id] [--daily]`, `hq shadow end [--id] [--notes]`, `hq shadow list`.
+  `hq outbox reject` now takes `--category` (reason optional when a category is given).
+- **Status**: day N of M (`day` can exceed `plannedDays`; `complete` = planned length reached), per agent: drafts, approved unchanged / with edits
+  (edited = body ratio > 0 or subject changed; median edit ratio of the edited ones, plus the scorecard's median over all approved), rejected by
+  category, lint errors, needs-human escalations (transitions into `waiting_approval`), median review time, waiting drafts, per-criterion progress,
+  and a daily trend (drafts by creation day; decisions by decision day). Nulls where there is no data.
+- **Verdict** (`shadowVerdict`): `below_bar` = compliance rejections over the limit (any volume) or, once at least `min(minDecided, 10)` drafts are
+  decided, approval rate / median edit ratio failing (lint rate once that many drafts exist); `not_enough_data` = too few decisions to judge, or quality
+  fine but the decision pace will not reach `minDecided` by the planned end; `on_track` otherwise. Every verdict carries a one-line reason with the numbers.
+- **Digest**: `DigestSnapshot.shadowRun` (null without an active run) carries day / plannedDays, the period's approve / edit / reject counts,
+  pending drafts, the oldest unreviewed draft, `pilingUp` (>= 10 pending or oldest >= 24h), every agent's verdict and `agentsBelowBar`. The Chief of
+  Staff's digest skill puts a piled-up backlog into "needs you today" (case `07-daily-digest-shadow-run-backlog`).
+- **UI**: Dashboard card, `/shadow` page (start / end with confirm dialogs, per-agent breakdown, daily trend), Inbox banner while a run is active.
 
 ## Setup wizard (backend)
 

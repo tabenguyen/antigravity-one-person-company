@@ -173,3 +173,22 @@ export interface EvalRun {
   results: EvalCaseResult[];
   summary: { total: number; pass: number; fail: number; error: number; skipped: number } | null;
 }
+
+// ---------------------------------------------------------------------------
+// Shadow runs — a bounded evaluation period (default 2 weeks) in which shadow-tier agents draft
+// on real mail and a human approves/edits/rejects, but nothing is ever sent. Status and verdicts
+// are computed on read (server: shadow.ts); only this record is stored.
+
+export const DEFAULT_SHADOW_PLANNED_DAYS = 14;
+
+export interface ShadowRun {
+  id: string;
+  startedAt: Iso;
+  /** Planned length in days (1..90). The run is never ended automatically; it just shows "complete". */
+  plannedDays: number;
+  /** Agents under evaluation. */
+  agentIds: string[];
+  notes: string | null;
+  /** null while the run is active. */
+  endedAt: Iso | null;
+}

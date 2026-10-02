@@ -14,7 +14,7 @@ function setup(overrides: Partial<Parameters<typeof makeTestConfig>[0]> = {}) {
     unsubscribeMailto: "unsubscribe@ourco.example",
     ...overrides,
   });
-  db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] } });
+  db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] }, trustTier: "assisted" });
   return { db, bus, provider, config };
 }
 

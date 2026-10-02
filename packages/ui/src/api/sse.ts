@@ -100,6 +100,7 @@ class EventHub {
       "setup.job.progress",
       "contact.handoff",
       "briefing.created",
+      "shadow.updated",
       // Emitted by the daemon and watched by pages (useApi refreshOn); without a listener here they never arrive.
       "task.created",
       "agent.created",

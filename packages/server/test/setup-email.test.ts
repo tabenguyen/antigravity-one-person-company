@@ -100,6 +100,20 @@ describe("email settings routes", () => {
     expect((await t.app.request("/v1/admin/setup/email")).status).toBe(401);
   });
 
+  it("syncSent / initialSyncDays default to off / 0, are validated, stored, passed to the provider and returned in the view", async () => {
+    const t = build();
+    const first = await t.call("PUT", "/v1/admin/setup/email", IMAP_INPUT);
+    expect(first.body.data.email).toMatchObject({ syncSent: false, initialSyncDays: 0 });
+    expect(t.created[0]!.cfg).toMatchObject({ syncSent: false, initialSyncDays: 0 });
+
+    const on = await t.call("PUT", "/v1/admin/setup/email", { ...IMAP_INPUT, syncSent: true, initialSyncDays: 7 });
+    expect(on.body.data.email).toMatchObject({ syncSent: true, initialSyncDays: 7 });
+    expect(t.created.at(-1)!.cfg).toMatchObject({ syncSent: true, initialSyncDays: 7 });
+    expect((await t.call("GET", "/v1/admin/setup/email")).body.data.email).toMatchObject({ syncSent: true, initialSyncDays: 7 });
+
+    expect((await t.call("PUT", "/v1/admin/setup/email", { ...IMAP_INPUT, initialSyncDays: 365 })).status).toBe(400);
+  });
+
   it("env AGYHQ_IMAP_PASS / AGYHQ_SMTP_PASS win and are reported; they satisfy the password requirement", async () => {
     const t = build({ env: { AGYHQ_IMAP_PASS: "from-env-imap", AGYHQ_SMTP_PASS: "from-env-smtp" } });
     const noPass = { ...IMAP_INPUT, imap: { ...IMAP_INPUT.imap, pass: undefined }, smtp: { ...IMAP_INPUT.smtp, pass: undefined } };
@@ -120,7 +134,7 @@ describe("email settings routes", () => {
     expect(runtime.provider).toBe(initial);
 
     // Sender reads the provider through the runtime on every send
-    t.db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] } });
+    t.db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] }, trustTier: "assisted" });
     t.db.settings.patch({ outboundEnabled: true, quietHours: null, sendRatePerHour: 100 });
     const sender = new Sender({ config: t.config, db: t.db, bus: t.bus, provider: () => runtime.provider, pollIntervalMs: 1_000_000 });
     const draft = (to: string) => {

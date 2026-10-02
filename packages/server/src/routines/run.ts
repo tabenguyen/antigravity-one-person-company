@@ -9,6 +9,7 @@ import { nextRun } from "./cron.ts";
 import type { AccountReviewEntry, DigestSnapshot } from "../admin-types.ts";
 import { DAILY_DIGEST_KIND } from "../briefings.ts";
 import { computeKpisSince } from "../kpis.ts";
+import { buildShadowDigest } from "../shadow.ts";
 import { parseProspectingConfig, AccountReviewConfigZ, CustomTaskConfigZ, DailyDigestConfigZ, PipelineReviewConfigZ } from "./config.ts";
 
 export const RESEARCH_KIND = "sdr.research_lead";
@@ -177,7 +178,8 @@ export function buildPipelineSnapshot(db: Db, agentId: string, now: Date, maxCon
     .filter((r) => !isOptedOut(parseAttrs(r.attributes)))
     .map((r) => {
       const email = r.email.toLowerCase();
-      const touchAt = (lastTouch.get(agentId, email) as { at: string | null }).at;
+      // A human emailing them from their own mail client (Sent-folder sync) is a touch too: no "stale, chase again" hint.
+      const touchAt = [(lastTouch.get(agentId, email) as { at: string | null }).at, db.humanSent.lastSentTo(email)].filter((x): x is string => !!x).sort().pop() ?? null;
       const replyAt = (lastReply.get(email) as { at: string | null }).at;
       const tasks = (openTasks.all(`contact:${email}`, ...OPEN_TASK_STATUSES) as { kind: string; status: string; wake_at: string | null }[]).map(
         (t) => ({ kind: t.kind, status: t.status, wakeAt: t.wake_at }),
@@ -253,7 +255,7 @@ export function buildAccountSnapshot(db: Db, agentId: string, now: Date, maxAcco
       const email = r.email.toLowerCase();
       const sentAt = (lastSent.get(email) as { at: string | null }).at;
       const inboundAt = (lastInbound.get(email) as { at: string | null }).at;
-      const activityAt = [sentAt, inboundAt].filter((x): x is string => !!x).sort().pop() ?? null;
+      const activityAt = [sentAt, inboundAt, db.humanSent.lastSentTo(email)].filter((x): x is string => !!x).sort().pop() ?? null;
       const basis = activityAt ?? r.updated_at;
       const days = Math.max(0, Math.floor((now.getTime() - new Date(basis).getTime()) / 86_400_000));
       const tasks = (openTasks.all(`contact:${email}`, ...OPEN_TASK_STATUSES) as { kind: string; status: string; wake_at: string | null }[]).map(
@@ -349,6 +351,7 @@ export function buildDigestSnapshot(db: Db, since: Date, now: Date): DigestSnaps
         at: e.at,
       })),
     },
+    shadowRun: buildShadowDigest(db, since, now),
   };
 }
 

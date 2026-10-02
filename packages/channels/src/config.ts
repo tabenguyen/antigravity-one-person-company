@@ -19,6 +19,12 @@ export type EmailProviderConfig =
       mailbox?: string;
       /** Append a copy of every sent message here; null = don't (Gmail saves SMTP sends itself). */
       sentFolder?: string | null;
+      /** Opt-in: also read the Sent folder (what the human sent from their own mail client). @default false */
+      syncSent?: boolean;
+      /** First-sync window in days; 0 = only mail arriving after the first connection. @default 0 */
+      initialSyncDays?: number;
+      /** Cap on existing mail a first sync / UIDVALIDITY resync may pull in. @default 200 */
+      initialSyncMaxMessages?: number;
     }
   | { kind: "maildir"; root: string; address: string; displayName?: string }
   | { kind: "none" };
@@ -33,6 +39,9 @@ export function createEmailProvider(cfg: EmailProviderConfig): EmailProvider | n
         smtp: cfg.smtp,
         mailbox: cfg.mailbox,
         sentFolder: cfg.sentFolder,
+        syncSent: cfg.syncSent,
+        initialSyncDays: cfg.initialSyncDays,
+        initialSyncMaxMessages: cfg.initialSyncMaxMessages,
       });
     case "maildir":
       return new MaildirProvider({ root: cfg.root, address: cfg.address, displayName: cfg.displayName });

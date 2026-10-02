@@ -20,3 +20,15 @@ export type {
   ImapSmtpProviderOptions,
   SmtpTransportFactory,
 } from "./providers/imap-smtp.ts";
+export { describeMailError, scrubSecrets, isDefinitiveServerError } from "./errors.ts";
+export type { MailProtocol } from "./errors.ts";
+export {
+  DEFAULT_SYNC_POLICY,
+  formatImapCursor,
+  parseImapCursor,
+  pickSentFolder,
+  resolveStartUid,
+} from "./providers/imap-sync.ts";
+export type { FolderInfo, ImapCursor, SentFolderResult, StartPlan, SyncPolicy } from "./providers/imap-sync.ts";
+export { runMailboxDoctor, DOCTOR_WINDOWS_DAYS } from "./doctor.ts";
+export type { DoctorSample, DoctorStep, MailboxDoctorOptions, MailboxDoctorReport } from "./doctor.ts";

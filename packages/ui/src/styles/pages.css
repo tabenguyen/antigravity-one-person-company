@@ -268,3 +268,10 @@
     margin-bottom: var(--space-2);
   }
 }
+
+/* Inbox: agent filter sits at the end of the status tabs */
+.inbox-agent-filter {
+  margin-left: auto;
+  align-self: center;
+  max-width: 100%;
+}

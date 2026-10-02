@@ -67,17 +67,18 @@ export function registerQualityRoutes(app: Hono, deps: AdminApiDeps): void {
       const existing = db.outbox.get(id);
       if (!existing) throw new NotFoundError("outbox item", id);
       const category = parsed.data.category ?? "other";
+      const reason = parsed.data.reason?.trim() || "no written feedback";
       const decidedBy = parsed.data.reviewer ? `human:${parsed.data.reviewer}` : "human:admin";
       const item = db.outbox.decide(id, "rejected", {
         decidedBy,
-        decisionNote: parsed.data.reason,
+        decisionNote: reason,
         decidedAt: new Date().toISOString(),
         rejectionCategory: category,
       });
       const subject = item.threadKey ?? `outbox:${item.id}`;
       const memory = db.memory.propose(
         item.agentId,
-        `Human rejected your draft to ${item.to} (${category}): ${parsed.data.reason}`,
+        `Human rejected your draft to ${item.to} (${category}): ${reason}`,
         subject,
       );
       db.memory.setStatus(memory.id, "accepted");
@@ -86,7 +87,7 @@ export function registerQualityRoutes(app: Hono, deps: AdminApiDeps): void {
         agentId: item.agentId,
         taskId: item.taskId,
         conversationId: null,
-        data: { id: item.id, reason: parsed.data.reason, category, memoryId: memory.id },
+        data: { id: item.id, reason, category, memoryId: memory.id },
       });
       bus.emit("outbox.updated", { outboxId: id, status: "rejected" });
       return { item };

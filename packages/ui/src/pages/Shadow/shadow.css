@@ -1,0 +1,241 @@
+/* Shadow run page + dashboard card. Tokens only; works down to ~360px. */
+
+/* Progress bar: day N of M */
+.sh-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  overflow: hidden;
+  margin: var(--space-2) 0;
+}
+.sh-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-shadow-tier);
+}
+.sh-progress-fill.sh-complete {
+  background: var(--color-success);
+}
+
+/* Dashboard card */
+.shadow-card {
+  grid-column: span 2;
+}
+@media (max-width: 520px) {
+  .shadow-card {
+    grid-column: auto;
+  }
+}
+.shadow-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.shadow-card-agents {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.shadow-card-agents li {
+  display: grid;
+  gap: 2px;
+}
+.shadow-card-agent-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.sh-reason {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Page header block */
+.sh-hero {
+  display: grid;
+  gap: var(--space-2);
+}
+.sh-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.sh-day {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.sh-day small {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+.sh-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  color: var(--color-text-muted);
+}
+.sh-totals strong {
+  color: var(--color-text);
+}
+.sh-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Per-agent section */
+.sh-agent {
+  margin-top: var(--space-4);
+}
+.sh-agent-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.sh-agent-head h2 {
+  margin: 0;
+}
+.sh-verdict {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-border);
+  background: var(--color-surface-alt);
+  overflow-wrap: anywhere;
+}
+.sh-verdict.sh-on_track {
+  border-left-color: var(--color-success);
+  background: var(--color-success-bg);
+}
+.sh-verdict.sh-below_bar {
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+.sh-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+.sh-count {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  min-width: 0;
+}
+.sh-count .stat-value {
+  font-size: 20px;
+}
+.sh-count .faint {
+  font-size: 11px;
+}
+.sh-criteria-title {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+/* Daily trend: tiny stacked bars, one row per day */
+.sh-trend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.sh-trend li {
+  display: grid;
+  grid-template-columns: 5.2rem minmax(40px, 1fr) repeat(4, 2.4rem);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.sh-trend li.sh-trend-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+.sh-trend .num {
+  text-align: right;
+}
+.sh-trend li > span:first-child {
+  white-space: nowrap;
+}
+.sh-trend .sh-today {
+  font-weight: 700;
+}
+.sh-stack {
+  display: flex;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-alt);
+}
+.sh-seg-ok {
+  background: var(--color-success);
+}
+.sh-seg-edit {
+  background: var(--color-warning);
+}
+.sh-seg-rej {
+  background: var(--color-danger);
+}
+.sh-legend {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+.sh-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.sh-agents-lower {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-3);
+}
+.sh-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Start dialog */
+.sh-agent-pick {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.sh-agent-pick label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sh-agent-pick input {
+  width: auto;
+}

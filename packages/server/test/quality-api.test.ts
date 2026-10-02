@@ -167,6 +167,15 @@ describe("reject with category", () => {
     expect(db.memory.list("sdr-01")[0]!.content).toContain("(other): nope");
     expect((await call("POST", `/v1/admin/outbox/${draft.id}/reject`, { reason: "again" })).status).toBe(409);
   });
+
+  it("accepts a category alone (one-click rejection) and records that no feedback was written", async () => {
+    const { db, call, draft } = setup();
+    expect((await call("POST", `/v1/admin/outbox/${draft.id}/reject`, { reason: "  " })).status).toBe(400);
+    const res = await call("POST", `/v1/admin/outbox/${draft.id}/reject`, { category: "too_long" });
+    expect(res.status).toBe(200);
+    expect(res.json.data.item).toMatchObject({ status: "rejected", rejectionCategory: "too_long", decisionNote: "no written feedback" });
+    expect(db.memory.list("sdr-01")[0]!.content).toBe("Human rejected your draft to a@x.com (too_long): no written feedback");
+  });
 });
 
 describe("scorecards + criteria + promote routes", () => {

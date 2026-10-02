@@ -6,12 +6,13 @@
 import { createHash } from "node:crypto";
 import { nowIso } from "@agyhq/core";
 import type { Db, CreateInboundInput } from "@agyhq/db";
-import type { Contact, EmailProvider, InboundClassification, InboundEvent, ParsedEmail, Task } from "@agyhq/core";
+import type { Agent, Contact, EmailProvider, InboundClassification, InboundEvent, ParsedEmail, Task } from "@agyhq/core";
 import { classifyEmail } from "@agyhq/channels";
 import type { AgyhqConfig } from "./config.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { WebhookLeadRequest } from "./admin-types.ts";
-import { effectiveSender } from "./setup/sender-settings.ts";
+import { ourAddresses, threadFromHeaders } from "./mail-thread.ts";
+import { ingestSentEmail } from "./sent-sync.ts";
 import { buildRoster, cancelThreadTasks, isAssignable, roleRouting } from "./routing.ts";
 import { attachmentMeta, attachmentsRoot, eventAttachments, saveAttachments, withAttachmentNote } from "./attachments.ts";
 
@@ -25,14 +26,6 @@ function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-function ourAddresses(config: AgyhqConfig, db: Db): string[] {
-  const addrs: string[] = [];
-  const senderAddress = effectiveSender(config, db).address;
-  if (senderAddress) addrs.push(senderAddress.toLowerCase());
-  if ("address" in config.email && config.email.address) addrs.push(config.email.address.toLowerCase());
-  return [...new Set(addrs)];
-}
-
 function cancelTasksOnThread(ctx: InboundCtx, threadKey: string | null, kinds?: string[]): void {
   for (const id of cancelThreadTasks(ctx.db, threadKey, kinds)) {
     ctx.bus.emit("task.transition", { taskId: id, to: "cancelled", reason: "inbound routing" });
@@ -44,10 +37,17 @@ function buildThreadSummary(ctx: InboundCtx, threadKey: string | null, currentEv
   if (!threadKey) return "(no prior thread)";
   const sent = ctx.db.outbox.listByThreadKey(threadKey, 10).filter((i) => i.status === "sent");
   const inbound = ctx.db.inbound.listByThreadKey(threadKey, 10).filter((i) => i.id !== currentEventId);
+  const human = ctx.db.humanSent.listByThreadKey(threadKey, 10);
   const items: { at: string; text: string }[] = [
     ...sent.map((s) => ({
       at: s.sentAt ?? s.updatedAt,
       text: `We sent ("${s.subject ?? "(no subject)"}"): ${truncate(s.body, 400)}`,
+    })),
+    // Mail a human on our team sent from their own mail client (Sent-folder sync): an agent must know the thread was
+    // already answered and what was said.
+    ...human.map((h) => ({
+      at: h.sentAt,
+      text: `A teammate replied from their own mail client ("${h.subject ?? "(no subject)"}"): ${truncate(h.bodyText.trim(), 400) || "(empty body)"}`,
     })),
     ...inbound.map((i) => ({
       at: i.receivedAt,
@@ -133,8 +133,8 @@ function contactFor(ctx: InboundCtx, event: InboundEvent): Contact | null {
  * Manager; else the default SDR. Each candidate must exist, not be archived, and have a role that answers replies
  * (a template `routing.replyKind`) — otherwise null, and the caller falls back to the Chief of Staff.
  */
-function resolveReplyOwner(
-  ctx: InboundCtx,
+export function resolveReplyOwner(
+  ctx: Pick<InboundCtx, "db" | "config">,
   contact: Contact | null,
   opts: { sdrFallback?: boolean } = {},
 ): { agentId: string; replyKind: string; followUpKinds: string[] } | null {
@@ -208,10 +208,16 @@ function routeToOwner(
  * Nothing owns this message: hand it to the default Chief of Staff as a `cos.triage` task carrying the roster of
  * agents it may delegate to. Returns false when no Chief of Staff is configured (the caller keeps today's behaviour).
  */
-function routeToChiefOfStaff(ctx: InboundCtx, event: InboundEvent, contact: Contact | null, threadKey: string | null): boolean {
+/** The default Chief of Staff, if one is configured and can still take work. */
+export function resolveCos(ctx: Pick<InboundCtx, "db">): Agent | null {
   const cosId = ctx.db.settings.get().defaultCosAgentId;
   const cos = cosId ? ctx.db.agents.get(cosId) : null;
-  if (!cos || !isAssignable(cos)) return false;
+  return cos && isAssignable(cos) ? cos : null;
+}
+
+function routeToChiefOfStaff(ctx: InboundCtx, event: InboundEvent, contact: Contact | null, threadKey: string | null): boolean {
+  const cos = resolveCos(ctx);
+  if (!cos) return false;
   const task = ctx.db.tasks.create({
     agentId: cos.id,
     kind: "cos.triage",
@@ -324,34 +330,29 @@ export function routeInboundEvent(ctx: InboundCtx, event: InboundEvent): void {
   }
 }
 
-/** Classify, persist (deduped by Message-ID) and deterministically route one parsed inbound email. Returns null if skipped (our own mail). */
-export function ingestEmail(ctx: InboundCtx, parsed: ParsedEmail): InboundEvent | null {
-  const ours = ourAddresses(ctx.config, ctx.db);
-  if (parsed.from?.address && ours.includes(parsed.from.address.toLowerCase())) return null;
+export interface InboundAnalysis {
+  ours: string[];
+  signals: ReturnType<typeof classifyEmail>;
+  threadKey: string | null;
+  /** The thread came from In-Reply-To/References matching mail we know (not just "same sender"). */
+  resolvedViaHeaders: boolean;
+  contact: Contact | null;
+  classification: InboundClassification;
+}
 
+/** Pure analysis of one inbound email (no writes): signals, thread, contact and classification. Shared with the email doctor. */
+export function analyzeInbound(ctx: Pick<InboundCtx, "db" | "config">, parsed: ParsedEmail): InboundAnalysis {
+  const ours = ourAddresses(ctx.config, ctx.db);
   const signals = classifyEmail(parsed, { ourAddresses: ours });
 
-  const candidateIds = [parsed.inReplyTo, ...parsed.references].filter((x): x is string => !!x);
-  let threadKey: string | null = null;
-  let resolvedViaHeaders = false;
-  for (const mid of candidateIds) {
-    const outboxHit = ctx.db.outbox.findByMessageId(mid);
-    if (outboxHit?.threadKey) {
-      threadKey = outboxHit.threadKey;
-      resolvedViaHeaders = true;
-      break;
-    }
-    const inboundHit = ctx.db.inbound.findByMessageId(mid);
-    if (inboundHit?.threadKey) {
-      threadKey = inboundHit.threadKey;
-      resolvedViaHeaders = true;
-      break;
-    }
-  }
+  let threadKey: string | null = threadFromHeaders(ctx.db, parsed);
+  const resolvedViaHeaders = threadKey !== null;
   if (!threadKey && parsed.from?.address) threadKey = `contact:${parsed.from.address.toLowerCase()}`;
 
   const contact = parsed.from?.address ? (ctx.db.crm.findContacts({ email: parsed.from.address })[0] ?? null) : null;
-  const hasPriorOutbound = threadKey ? ctx.db.outbox.listByThreadKey(threadKey, 1).length > 0 : false;
+  const hasPriorOutbound = threadKey
+    ? ctx.db.outbox.listByThreadKey(threadKey, 1).length > 0 || ctx.db.humanSent.listByThreadKey(threadKey, 1).length > 0
+    : false;
 
   let classification: InboundClassification;
   if (signals.isUnsubscribe) classification = "unsubscribe";
@@ -359,6 +360,15 @@ export function ingestEmail(ctx: InboundCtx, parsed: ParsedEmail): InboundEvent 
   else if (signals.isAutoReply) classification = "auto_reply";
   else if (signals.isLikelySpam) classification = "spam";
   else classification = resolvedViaHeaders || hasPriorOutbound ? "reply" : "new_lead";
+  return { ours, signals, threadKey, resolvedViaHeaders, contact, classification };
+}
+
+/** Classify, persist (deduped by Message-ID) and deterministically route one parsed inbound email. Returns null if skipped (our own mail). */
+export function ingestEmail(ctx: InboundCtx, parsed: ParsedEmail): InboundEvent | null {
+  const ours = ourAddresses(ctx.config, ctx.db);
+  if (parsed.from?.address && ours.includes(parsed.from.address.toLowerCase())) return null;
+
+  const { signals, threadKey, contact, classification } = analyzeInbound(ctx, parsed);
 
   const externalId = parsed.messageId ?? `no-message-id:${parsed.providerId}`;
   const input: CreateInboundInput = {
@@ -446,17 +456,35 @@ export interface PollSource {
   generation?(): number;
 }
 
+/** Poll cursor keys (db.channelCursors). The Sent-folder cursor is separate and is reset together with the inbox one. */
+export const EMAIL_INBOX_CURSOR_KEY = "email";
+export const EMAIL_SENT_CURSOR_KEY = "email-sent";
+
+const POLL_BATCH = 25;
+/** A full batch means there is probably more waiting: keep draining, but never hog the loop for long. */
+const MAX_BATCHES_PER_POLL = 4;
+
+export interface SentSyncStatus {
+  enabled: boolean;
+  folder: string | null;
+  lastPollAt: string | null;
+  lastError: string | null;
+  /** Counts since the daemon started, by outcome (recorded / own / unrelated / duplicate / no_recipient). */
+  counts: Record<string, number>;
+}
+
 /** Polls an EmailProvider on an interval, persisting its cursor across restarts via db.channelCursors. */
 export class EmailPoller {
   #ctx: InboundCtx;
   #source: PollSource;
-  #cursorKey = "email";
+  #cursorKey = EMAIL_INBOX_CURSOR_KEY;
   #timer: NodeJS.Timeout | null = null;
   #stopped = false;
   #started = false;
   #polling: Promise<void> | null = null;
   #lastPollAt: string | null = null;
   #lastError: string | null = null;
+  #sent: SentSyncStatus = { enabled: false, folder: null, lastPollAt: null, lastError: null, counts: {} };
 
   /** `source` may be a fixed provider + interval (the original signature) or a PollSource for hot-swapping. */
   constructor(ctx: InboundCtx, source: EmailProvider | PollSource, intervalMs?: number) {
@@ -475,6 +503,11 @@ export class EmailPoller {
     return this.#lastError;
   }
 
+  /** Sent-folder sync state (enabled=false when the provider does not read a Sent folder). */
+  get sentSync(): SentSyncStatus {
+    return { ...this.#sent, counts: { ...this.#sent.counts } };
+  }
+
   start(): void {
     this.#started = true;
     this.#stopped = false;
@@ -487,6 +520,7 @@ export class EmailPoller {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     this.#lastError = null;
+    this.#sent = { enabled: false, folder: null, lastPollAt: null, lastError: null, counts: {} };
     this.#schedule(0);
   }
 
@@ -519,6 +553,11 @@ export class EmailPoller {
     return this.#polling;
   }
 
+  /** One poll cycle (exposed so tests can drive it deterministically): inbox first, then the Sent folder. */
+  pollNow(): Promise<void> {
+    return this.#poll();
+  }
+
   async #pollOnce(): Promise<void> {
     const provider = this.#source.provider();
     const generation = this.#source.generation?.() ?? 0;
@@ -528,19 +567,22 @@ export class EmailPoller {
         this.#lastError = null;
         return;
       }
-      const cursor = this.#ctx.db.channelCursors.get(this.#cursorKey);
-      const { messages, cursor: nextCursor } = await provider.fetchNew(cursor, { limit: 25 });
-      // The mailbox was swapped while we were fetching: these messages belong to the old setup, and writing their
-      // cursor would corrupt the new one.
-      if (stale()) return;
-      for (const msg of messages) {
-        try {
-          ingestEmail(this.#ctx, msg);
-        } catch (err) {
-          this.#ctx.bus.emit("inbound.error", { error: (err as Error).message });
+      for (let batch = 0; batch < MAX_BATCHES_PER_POLL; batch++) {
+        const cursor = this.#ctx.db.channelCursors.get(this.#cursorKey);
+        const { messages, cursor: nextCursor } = await provider.fetchNew(cursor, { limit: POLL_BATCH });
+        // The mailbox was swapped while we were fetching: these messages belong to the old setup, and writing their
+        // cursor would corrupt the new one.
+        if (stale()) return;
+        for (const msg of messages) {
+          try {
+            ingestEmail(this.#ctx, msg);
+          } catch (err) {
+            this.#ctx.bus.emit("inbound.error", { error: (err as Error).message });
+          }
         }
+        if (nextCursor !== cursor && !stale()) this.#ctx.db.channelCursors.set(this.#cursorKey, nextCursor);
+        if (messages.length < POLL_BATCH || nextCursor === cursor) break;
       }
-      if (nextCursor !== cursor && !stale()) this.#ctx.db.channelCursors.set(this.#cursorKey, nextCursor);
       this.#lastError = null;
     } catch (err) {
       if (stale()) return;
@@ -548,6 +590,41 @@ export class EmailPoller {
       this.#ctx.bus.emit("inbound.error", { error: this.#lastError });
     } finally {
       this.#lastPollAt = nowIso();
+    }
+    // Sent-folder sync is independent: its failure (e.g. no Sent folder) must never affect inbox health.
+    if (provider) await this.#pollSent(provider, stale);
+  }
+
+  async #pollSent(provider: EmailProvider, stale: () => boolean): Promise<void> {
+    if (!provider.syncsSent || !provider.fetchSent) {
+      if (this.#sent.enabled) this.#sent = { enabled: false, folder: null, lastPollAt: null, lastError: null, counts: {} };
+      return;
+    }
+    this.#sent.enabled = true;
+    try {
+      for (let batch = 0; batch < MAX_BATCHES_PER_POLL; batch++) {
+        const cursor = this.#ctx.db.channelCursors.get(EMAIL_SENT_CURSOR_KEY);
+        const { messages, cursor: nextCursor, folder } = await provider.fetchSent(cursor, { limit: POLL_BATCH });
+        if (stale()) return;
+        this.#sent.folder = folder;
+        for (const msg of messages) {
+          try {
+            const result = ingestSentEmail(this.#ctx, msg, folder);
+            this.#sent.counts[result.outcome] = (this.#sent.counts[result.outcome] ?? 0) + 1;
+          } catch (err) {
+            this.#ctx.bus.emit("inbound.error", { error: `sent folder: ${(err as Error).message}` });
+          }
+        }
+        if (nextCursor !== cursor && !stale()) this.#ctx.db.channelCursors.set(EMAIL_SENT_CURSOR_KEY, nextCursor);
+        if (messages.length < POLL_BATCH || nextCursor === cursor) break;
+      }
+      this.#sent.lastError = null;
+    } catch (err) {
+      if (stale()) return;
+      this.#sent.lastError = (err as Error).message;
+      this.#ctx.bus.emit("inbound.error", { error: `sent folder: ${this.#sent.lastError}` });
+    } finally {
+      this.#sent.lastPollAt = nowIso();
     }
   }
 }

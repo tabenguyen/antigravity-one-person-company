@@ -303,6 +303,18 @@ export class OutboxRepo {
     return { ...existing, statusReason, updatedAt };
   }
 
+  /**
+   * Mark a not-yet-sent item as superseded (a human already answered from their own mail client) without changing
+   * its status: the reason is shown next to the draft and the Sender refuses an approved item that carries it.
+   */
+  annotateSuperseded(id: string, reason: string): OutboxItem {
+    const existing = this.get(id);
+    if (!existing) throw new NotFoundError("outbox item", id);
+    const updatedAt = nowIso();
+    this.#db.prepare("UPDATE outbox SET status_reason = ?, updated_at = ? WHERE id = ?").run(reason, updatedAt, id);
+    return { ...existing, statusReason: reason, updatedAt };
+  }
+
   /** Reject every pending_approval/approved item to `address` (opt-out). Returns the rejected items. */
   rejectAllTo(address: string, decidedBy: string, reason: string): OutboxItem[] {
     const rows = this.#db

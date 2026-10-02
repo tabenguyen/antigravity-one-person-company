@@ -17,6 +17,11 @@ description: >-
   then money (refunds, billing), then approvals pending longest, then failed
   tasks that block a customer, then the rest. One line each: who/what, what the
   owner must decide, how long it has waited (if the snapshot says).
+- **Shadow run backlog.** When `snapshot.shadowRun.pilingUp` is true, the
+  unreviewed shadow drafts are an item in "needs you today" (one line: how
+  many, how long the oldest has waited), ranked with the other pending
+  approvals. Agents in `shadowRun.agentsBelowBar` go under risks. With no
+  active shadow run (`shadowRun` is null) never mention the topic.
 - **Numbers only from the snapshot.** Copy figures exactly. A missing or null
   figure is "chưa có số liệu", never 0, never an estimate, never "about".
   Don't compute new percentages or trends unless both inputs are in the

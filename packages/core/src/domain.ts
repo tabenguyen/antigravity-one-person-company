@@ -332,6 +332,33 @@ export interface InboundEvent {
   createdAt: Iso;
 }
 
+/**
+ * A message the mailbox owner sent from their OWN mail client (read from the mailbox's Sent folder, opt-in), recorded
+ * so agents know what a human already answered. Only kept when it is related to something we know: it continues a
+ * thread we have seen, or it is addressed to an existing contact. Never created for unrelated personal mail.
+ */
+export interface HumanSentMessage {
+  id: string;
+  /** Message-ID, or "no-message-id:<folder>:<providerId>" — the dedupe key. */
+  externalId: string;
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
+  /** First recipient (To, else Cc) that is not our own address. */
+  toAddress: string | null;
+  /** All To+Cc addresses, lowercased. */
+  recipients: string[];
+  subject: string | null;
+  /** Plain text with quoted history stripped. */
+  bodyText: string;
+  threadKey: string | null;
+  contactId: string | null;
+  folder: string | null;
+  /** The message's own Date header (clamped to now). */
+  sentAt: Iso;
+  createdAt: Iso;
+}
+
 // ---------------------------------------------------------------------------
 // Audit
 
@@ -368,7 +395,12 @@ export type AuditKind =
   | "routine.ran"
   | "eval.finished"
   | "contact.handoff"
-  | "briefing.created";
+  | "email.human_sent"
+  | "outbox.superseded"
+  | "email.test_sent"
+  | "briefing.created"
+  | "shadow.started"
+  | "shadow.ended";
 
 // ---------------------------------------------------------------------------
 // Daemon settings (persisted, editable from agy-ui / CLI)

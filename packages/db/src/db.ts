@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
 import DatabaseCtor from "better-sqlite3";
 import type Database from "better-sqlite3";
 import { runMigrations } from "./migrations.ts";
@@ -18,6 +21,8 @@ import { KvRepo } from "./repos/kv.ts";
 import { RoutinesRepo } from "./repos/routines.ts";
 import { EvalRunsRepo } from "./repos/evalRuns.ts";
 import { BriefingsRepo } from "./repos/briefings.ts";
+import { ShadowRunsRepo } from "./repos/shadowRuns.ts";
+import { HumanSentRepo } from "./repos/humanSent.ts";
 
 type SqliteDb = Database.Database;
 
@@ -40,6 +45,8 @@ export interface Db {
   routines: RoutinesRepo;
   evalRuns: EvalRunsRepo;
   briefings: BriefingsRepo;
+  shadowRuns: ShadowRunsRepo;
+  humanSent: HumanSentRepo;
   /** Run fn inside a single SQLite transaction; its return value is passed through. */
   transaction<T>(fn: () => T): T;
   close(): void;
@@ -75,6 +82,8 @@ export function openDb(path: string | ":memory:"): Db {
     routines: new RoutinesRepo(sqlite),
     evalRuns: new EvalRunsRepo(sqlite),
     briefings: new BriefingsRepo(sqlite),
+    shadowRuns: new ShadowRunsRepo(sqlite),
+    humanSent: new HumanSentRepo(sqlite),
     transaction<T>(fn: () => T): T {
       return sqlite.transaction(fn)();
     },
@@ -83,4 +92,40 @@ export function openDb(path: string | ":memory:"): Db {
     },
   };
   return db;
+}
+
+/**
+ * A throw-away, migrated COPY of the database at `path` for read-only dry runs (e.g. `hq email doctor --local`): the
+ * source is opened read-only and copied with SQLite's online backup, so the live file is never written. Falls back to
+ * an empty in-memory database when there is nothing to copy. Call `cleanup()` when done.
+ */
+export async function openDbSnapshot(path: string): Promise<{ db: Db; cleanup: () => void; fromFile: boolean }> {
+  if (path !== ":memory:" && fs.existsSync(path)) {
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), "agyhq-snapshot-"));
+    const dest = nodePath.join(dir, "snapshot.db");
+    try {
+      const src = new DatabaseCtor(path, { readonly: true, fileMustExist: true });
+      try {
+        await src.backup(dest);
+      } finally {
+        src.close();
+      }
+      const db = openDb(dest);
+      return {
+        db,
+        fromFile: true,
+        cleanup: () => {
+          try {
+            db.close();
+          } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+          }
+        },
+      };
+    } catch {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  const db = openDb(":memory:");
+  return { db, fromFile: false, cleanup: () => db.close() };
 }

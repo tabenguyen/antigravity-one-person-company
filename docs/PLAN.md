@@ -222,6 +222,8 @@ from the model's head.
 **Phase 3 — First role end-to-end in shadow mode** — tooling ✅ built 2026-10-01 (readiness gate + setup, draft lint, scorecards/promotion, routines, SDR eval suite: baseline 7/7 on gemini-3.8-flash-medium); the 2-week shadow run itself needs a real mailbox + company profile
 - Sales SDR, real inbox, nothing auto-sent.
 - Measure edit/approve rate for 2 weeks, then promote to `assisted`.
+- Shadow run as a first-class object (`hq shadow`, Shadow run page, digest section) and the human runbook: [SHADOW-RUN.md](SHADOW-RUN.md).
+- Real-mailbox readiness ✅ 2026-10-03: imap-smtp tested against real IMAP/SMTP protocol servers (hoodiecrow + smtp-server), read-only inbox access (EXAMINE / BODY.PEEK, never \\Seen), opt-in Sent-folder sync so agents see what the human replied, `hq email doctor` preflight: [EMAIL-SETUP.md](EMAIL-SETUP.md). Next: the human connects a real mailbox and starts the run.
 
 **Phase 4 — More roles + coordination** ✅ built 2026-10-03 — see [PHASE4.md](PHASE4.md): Account Manager + Chief of Staff roles, SDR→AM handoff, role-aware routing, account_review / daily_digest routines, briefings, per-role KPIs; real-agy evals AM 8/8, CoS 6/6 (SLA-bait case occasionally flaky). Marketer deferred (needs publishing channels).
 - Remaining roles, Chief-of-Staff triage, handoffs, recurring routines,

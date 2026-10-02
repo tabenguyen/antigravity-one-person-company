@@ -72,6 +72,12 @@ const EmailConfigFileZ = z.discriminatedUnion("kind", [
     mailbox: z.string().optional(),
     /** Append a copy of every sent message here; omit/null = don't (e.g. Gmail saves SMTP sends itself). */
     sentFolder: z.string().nullable().optional(),
+    /** Opt-in: also read the Sent folder, so the harness learns what humans answered from their own mail client. */
+    syncSent: z.boolean().optional(),
+    /** First sync: 0 (default) = only mail arriving after the first connection; N = also the last N days. */
+    initialSyncDays: z.number().int().min(0).max(90).optional(),
+    /** Cap on existing mail a first sync / UIDVALIDITY resync may pull in (default 200). */
+    initialSyncMaxMessages: z.number().int().min(1).max(5000).optional(),
     pollIntervalMs: z.number().int().positive().optional(),
   }),
 ]);

@@ -62,6 +62,15 @@ export interface EmailProvider {
   /** Fetch messages newer than `cursor` (null = provider decides a safe start, e.g. only new from now). */
   fetchNew(cursor: string | null, opts?: { limit?: number }): Promise<FetchResult>;
   send(email: OutgoingEmail): Promise<SendResult>;
+  /**
+   * Optional, opt-in: messages the mailbox owner sent from their OWN mail client (the mailbox's Sent folder), so the
+   * harness learns what humans already answered. Same cursor contract as fetchNew, but over a separate cursor.
+   * Absent / `syncsSent === false` = the provider does not (or is not configured to) read a Sent folder.
+   * Rejects when the Sent folder cannot be found (the message says why); callers treat that as non-fatal.
+   */
+  fetchSent?(cursor: string | null, opts?: { limit?: number }): Promise<FetchResult & { folder: string }>;
+  /** True when `fetchSent` is available and enabled for this provider instance. */
+  readonly syncsSent?: boolean;
   /** Cheap connectivity check for health/status UI. */
   verify(): Promise<{ ok: true } | { ok: false; error: string }>;
   close(): Promise<void>;

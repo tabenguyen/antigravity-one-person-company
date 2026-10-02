@@ -113,14 +113,18 @@ Dev/test provider backed by a plain directory:
 
 IMAP (via `imapflow`) for fetching, SMTP (via `nodemailer`) for sending.
 
-- **Cursor**: `"<uidValidity>:<lastUid>"`. A `null` cursor starts at the
-  mailbox's **current `UIDNEXT`** — i.e. only mail that arrives from now on;
-  it never backfills history on first run. If `UIDVALIDITY` has changed since
-  the stored cursor, it logs a warning and restarts from the current
-  `UIDNEXT`.
-- **Fetching** is by UID range with `source: true`, which makes `imapflow`
-  issue `BODY.PEEK[]` (never bare `BODY[]`), so `\Seen` is never set as a
-  side effect of reading mail. `limit` defaults to 50.
+- **Cursor**: `"<uidValidity>:<lastUid>[:<epochSec>]"` (the timestamp = when the mailbox was last fully caught up).
+  A `null` cursor starts at the mailbox's **current `UIDNEXT`** (only mail arriving from now on) unless
+  `initialSyncDays = N > 0`, which also pulls the last N days (capped by `initialSyncMaxMessages`, default 200).
+  If `UIDVALIDITY` changes, mail since the cursor's timestamp is re-scanned (duplicates are dropped by Message-ID at the
+  daemon); a legacy cursor without a timestamp restarts from the current `UIDNEXT`. The cursor also advances over runs
+  of deleted UIDs, so gaps cannot wedge the poller.
+- **Read-only**: mailboxes are opened with `EXAMINE` and messages fetched with `BODY.PEEK[]`; `\Seen` is never set,
+  nothing is moved or deleted. IDLE is disabled. `limit` defaults to 50.
+- **Sent folder** (`syncSent: true`): `fetchSent()` reads the Sent folder (`sentFolder`, else the `\Sent` special-use
+  folder, else `[Gmail]/Sent Mail` / `Sent Items` / `Sent` ...) with the same rules and its own cursor.
+- **Errors**: login/connection failures are described with hints (`describeMailError`), never contain passwords, and a
+  rejected login is not retried. A failed connect is not cached.
 - **Sending** uses nodemailer with the exact Message-ID you pass (wrapped in
   `<>` automatically), `In-Reply-To`, `References`, a `List-Unsubscribe`
   header when `listUnsubscribe` is set, and any extra `headers`. If
@@ -179,6 +183,11 @@ the right Message-ID/In-Reply-To/References/List-Unsubscribe.
 (cursor math, the `UIDVALIDITY`-change restart, reconnect-on-failure); its
 SMTP side is tested against real `nodemailer` transports
 (`streamTransport`/a hand-written object) rather than a real server.
+
+`test/imap-smtp.integration.test.ts` and `test/doctor.test.ts` run the real ImapFlow/nodemailer against in-process IMAP
+(`hoodiecrow-imap`) and SMTP (`smtp-server`) protocol servers (`test/support/mail-servers.ts`): login failures, cursor
+persistence, UIDVALIDITY change, dropped connections, first-sync policy on a 2,000-message mailbox, Vietnamese
+encodings, HTML-only mail, attachments, outbound threading headers, Sent-folder discovery, read-only guarantees.
 
 An opt-in end-to-end test against a **real** mailbox is gated behind
 `AGYHQ_EMAIL_TEST=1` plus `AGYHQ_TEST_IMAP_*`/`AGYHQ_TEST_SMTP_*`/

@@ -19,11 +19,11 @@ import type { EmailProvider } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
 import type { AgyhqConfig, EmailConfig } from "../config.ts";
 import type { EventBus } from "../event-bus.ts";
-import { EmailPoller } from "../inbound.ts";
+import { EMAIL_INBOX_CURSOR_KEY, EMAIL_SENT_CURSOR_KEY, EmailPoller } from "../inbound.ts";
 import { mailboxIdentity, passwordEnv, resolveEmail, type PasswordEnv } from "./email-settings.ts";
 import type { SecretBox } from "./secrets.ts";
 
-export const EMAIL_CURSOR_KEY = "email";
+export const EMAIL_CURSOR_KEY = EMAIL_INBOX_CURSOR_KEY;
 const IDENTITY_KV = "email_cursor_identity";
 
 export interface EmailRuntimeOptions {
@@ -144,7 +144,10 @@ export class EmailRuntime {
   #syncCursorIdentity(cfg: EmailConfig): void {
     const identity = mailboxIdentity(cfg);
     const prev = this.#db.kv.get<{ identity: string }>(IDENTITY_KV)?.identity ?? null;
-    if (prev !== null && prev !== identity) this.#db.channelCursors.set(EMAIL_CURSOR_KEY, null);
+    if (prev !== null && prev !== identity) {
+      this.#db.channelCursors.set(EMAIL_CURSOR_KEY, null);
+      this.#db.channelCursors.set(EMAIL_SENT_CURSOR_KEY, null);
+    }
     if (prev !== identity) this.#db.kv.set(IDENTITY_KV, { identity });
   }
 }

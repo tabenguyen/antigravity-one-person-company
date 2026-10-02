@@ -10,6 +10,7 @@ import { eventHub, type HubEvent } from "../../api/sse.ts";
 import { readinessApi, type ReadinessCheck } from "../../api/readiness.ts";
 import { KpiSection } from "./KpiSection.tsx";
 import { ReadinessSummaryCard } from "../Setup/ReadinessSummaryCard.tsx";
+import { ShadowCard } from "../Shadow/ShadowCard.tsx";
 
 export function DashboardPage() {
   const { status, refreshStatus } = useAuth();
@@ -74,6 +75,8 @@ export function DashboardPage() {
       <h1>Dashboard</h1>
 
       <div className="card-grid">
+        <ShadowCard />
+
         <div className="card">
           <div className="stat-label">Email provider</div>
           <div className="stat-value">{status?.email.provider ?? "—"}</div>

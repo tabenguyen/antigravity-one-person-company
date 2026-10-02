@@ -3,6 +3,7 @@
 // Response bodies are always @agyhq/core's ApiEnvelope<T>.
 
 import { z } from "zod";
+import type { CriterionCheck } from "./quality/scorecard.ts";
 import type {
   Agent,
   AgentRole,
@@ -11,6 +12,7 @@ import type {
   AuditEvent,
   Company,
   ContactView,
+  ShadowRun,
   KbHit,
   MemoryItem,
   OutboxItem,
@@ -246,6 +248,8 @@ export interface DaemonStatus {
     error: string | null;
     lastPollAt: string | null;
     lastSendAt: string | null;
+    /** Sent-folder sync (opt-in): what humans sent from their own mail client. Absent when the provider has none. */
+    sentSync?: { enabled: boolean; folder: string | null; lastPollAt: string | null; lastError: string | null; counts: Record<string, number> };
   };
   outboundEnabled: boolean;
   outboundDisabledReason: string | null;
@@ -424,7 +428,15 @@ export const RejectionCategoryZ = z.enum([
   "compliance",
   "other",
 ]) satisfies z.ZodType<RejectionCategory>;
-export const RejectOutboxWithCategoryRequestZ = RejectOutboxRequestZ.extend({ category: RejectionCategoryZ.optional() });
+// The written reason may be left out when a category is given (one-click rejection while reviewing a queue); the
+// category alone is then recorded and the agent memory says no written feedback was given.
+export const RejectOutboxWithCategoryRequestZ = RejectOutboxRequestZ.extend({
+  reason: z.string().max(2000).optional(),
+  category: RejectionCategoryZ.optional(),
+}).refine((d) => (d.reason !== undefined && d.reason.trim() !== "") || d.category !== undefined, {
+  message: "reason: required unless a category is given",
+  path: ["reason"],
+});
 export type RejectOutboxWithCategoryRequest = z.infer<typeof RejectOutboxWithCategoryRequestZ>;
 export type ScorecardsResponse = ApiEnvelope<{ days: number; criteria: PromotionCriteria; scorecards: AgentScorecard[] }>;
 export type PromotionCriteriaResponse = ApiEnvelope<{ criteria: PromotionCriteria }>;
@@ -566,6 +578,10 @@ export const EmailSettingsInputZ = z.discriminatedUnion("kind", [
     smtp: MailServerZ,
     mailbox: z.string().max(200).default("INBOX"),
     sentFolder: z.string().max(200).nullable().default(null),
+    /** Opt-in: read the Sent folder (what humans sent from their own mail client). Folder = sentFolder, else auto-detected. */
+    syncSent: z.boolean().default(false),
+    /** 0 = only mail arriving after the first connection (default); N = also the last N days. */
+    initialSyncDays: z.number().int().min(0).max(90).default(0),
     pollIntervalMs: z.number().int().min(15_000).max(3_600_000).default(60_000),
   }),
   z.object({ kind: z.literal("maildir"), address: z.string().email(), displayName: z.string().max(200).optional(), root: z.string().min(1) }),
@@ -579,6 +595,8 @@ export interface EmailSettingsView {
   smtp: { host: string; port: number; secure: boolean; user: string; hasPassword: boolean } | null;
   mailbox: string | null;
   sentFolder: string | null;
+  syncSent?: boolean;
+  initialSyncDays?: number;
   pollIntervalMs: number | null;
   root: string | null;
   source: "ui" | "config"; // where the active settings come from
@@ -721,4 +739,145 @@ export interface DigestSnapshot {
   needsHuman: { count: number; items: { taskId: string; agentId: string; kind: string; title: string; summary: string | null; since: string }[] };
   newContacts: { count: number; items: { contactId: string; name: string | null; email: string | null; company: string | null; source: string | null; stage: string }[] };
   handoffs: { count: number; items: { contactId: string; email: string | null; fromAgentId: string | null; toAgentId: string; summary: string; at: string }[] };
+  /** Active shadow run (null when none): progress, what the reviewer did in the period, backlog, agents below the bar. */
+  shadowRun: ShadowDigestSection | null;
+}
+
+// --- Shadow run (shadow.ts, admin-shadow.ts) ------------------------------------
+// A bounded evaluation window (default 14 days) over shadow-tier agents. Only the run is stored
+// (table shadow_runs); status, verdicts and trends are computed from outbox/audit on read.
+// GET  /v1/admin/shadow            → ShadowOverviewResponse  (active status, last finished status, history, agents that can be started)
+// GET  /v1/admin/shadow/:id        → ShadowStatusResponse
+// POST /v1/admin/shadow            body StartShadowRunRequest → ShadowStatusResponse   (409 if one is already active)
+// POST /v1/admin/shadow/:id/end    body EndShadowRunRequest   → ShadowStatusResponse
+// Definitions: window = [startedAt, endedAt ?? now]; per-agent figures are cohorted by draft createdAt (same as scorecards);
+// "approved with edits" = approved and (body changed or subject changed); per-day rows: drafts by creation day,
+// approved/edited/rejected by decision day (day 1 = the first 24h after startedAt). Null where there is no data.
+
+export const StartShadowRunRequestZ = z
+  .object({
+    plannedDays: z.number().int().min(1).max(90).optional(),
+    /** Default: every active shadow-tier agent that drafts email (not chief-of-staff). */
+    agentIds: z.array(z.string().min(1)).max(50).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .strict();
+export type StartShadowRunRequest = z.infer<typeof StartShadowRunRequestZ>;
+export const EndShadowRunRequestZ = z.object({ notes: z.string().max(2000).optional() }).strict();
+export type EndShadowRunRequest = z.infer<typeof EndShadowRunRequestZ>;
+
+export type ShadowVerdictStatus = "on_track" | "not_enough_data" | "below_bar";
+export interface ShadowVerdict {
+  status: ShadowVerdictStatus;
+  /** One sentence, with the numbers. */
+  reason: string;
+}
+
+export interface ShadowDailyRow {
+  /** 1-based day of the run. */
+  day: number;
+  /** ISO start of that 24h bucket. */
+  startAt: string;
+  /** Drafts created that day. */
+  drafts: number;
+  /** Decisions made that day (on drafts created during the run). */
+  approvedUnchanged: number;
+  approvedEdited: number;
+  rejected: number;
+}
+
+export interface ShadowAgentStatus {
+  agentId: string;
+  displayName: string;
+  role: string;
+  trustTier: TrustTier;
+  agentStatus: AgentStatus;
+  drafts: number;
+  /** Drafts of this agent waiting for a human right now (whole inbox, not just the window). */
+  pending: number;
+  oldestPendingAt: string | null;
+  decided: number;
+  approvedUnchanged: number;
+  approvedEdited: number;
+  /** Median edit ratio over the approved drafts that were edited (body ratio; 0 for a subject-only edit). null when none. */
+  medianEditRatioOfEdited: number | null;
+  /** Scorecard definition (all approved drafts, unedited count as 0) — the number the promotion criterion uses. */
+  medianEditRatio: number | null;
+  approvalRate: number | null;
+  rejected: number;
+  rejectionsByCategory: Partial<Record<RejectionCategory, number>>;
+  /** Drafts with a lint error plus drafts blocked by lint at draft time. */
+  lintErrors: number;
+  lintErrorRate: number | null;
+  /** Times a task of this agent was handed to a human (transitions into waiting_approval). */
+  needsHuman: number;
+  medianReviewMinutes: number | null;
+  /** Progress against the promotion criteria (same evaluation as the scorecard). */
+  criteria: CriterionCheck[];
+  /** Scorecard promotion verdict (all criteria met over the run window); null when already at the top tier. */
+  promotionEligible: boolean | null;
+  verdict: ShadowVerdict;
+  daily: ShadowDailyRow[];
+}
+
+export interface ShadowRunStatus {
+  run: ShadowRun;
+  /** True while the run has not been ended. */
+  active: boolean;
+  /** 1-based day number as of now (or of the end, for a finished run); can exceed plannedDays. */
+  day: number;
+  plannedDays: number;
+  daysRemaining: number;
+  /** Planned length reached (elapsed >= plannedDays) — time to decide. */
+  complete: boolean;
+  /** startedAt + plannedDays. */
+  endsAt: string;
+  asOf: string;
+  criteria: PromotionCriteria;
+  agents: ShadowAgentStatus[];
+  totals: {
+    drafts: number;
+    approvedUnchanged: number;
+    approvedEdited: number;
+    rejected: number;
+    pending: number;
+    oldestPendingAt: string | null;
+  };
+  daily: ShadowDailyRow[];
+}
+
+export interface ShadowStartCandidate {
+  agentId: string;
+  displayName: string;
+  role: string;
+}
+
+export interface ShadowOverview {
+  active: ShadowRunStatus | null;
+  /** The most recently finished run, so its result stays visible after "end". */
+  last: ShadowRunStatus | null;
+  history: ShadowRun[];
+  /** Active shadow-tier agents a new run could cover. */
+  candidates: ShadowStartCandidate[];
+}
+export type ShadowOverviewResponse = ApiEnvelope<ShadowOverview>;
+export type ShadowStatusResponse = ApiEnvelope<{ status: ShadowRunStatus }>;
+
+/** Digest snapshot section (see buildDigestSnapshot in routines/run.ts). */
+export interface ShadowDigestSection {
+  runId: string;
+  startedAt: string;
+  plannedDays: number;
+  day: number;
+  daysRemaining: number;
+  complete: boolean;
+  /** What the reviewer did in the digest period (decisions made in [since, until] on drafts of the run's agents). */
+  period: { since: string; until: string; draftsCreated: number; approvedUnchanged: number; approvedEdited: number; rejected: number };
+  pendingDrafts: number;
+  /** Oldest draft of the run's agents still waiting for a human. */
+  oldestUnreviewed: { outboxId: string; agentId: string; to: string; subject: string | null; createdAt: string; ageHours: number } | null;
+  /** True when the backlog is piling up (many pending drafts, or the oldest one is more than a day old). */
+  pilingUp: boolean;
+  agents: { agentId: string; displayName: string; verdict: ShadowVerdictStatus; reason: string; decided: number }[];
+  agentsBelowBar: { agentId: string; displayName: string; reason: string }[];
 }

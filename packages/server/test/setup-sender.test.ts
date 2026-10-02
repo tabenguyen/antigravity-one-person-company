@@ -41,7 +41,7 @@ describe("sender settings routes", () => {
   it("UI sender drives the outgoing From, footer and List-Unsubscribe (not the config file)", async () => {
     const t = buildSetupEnv({ config: EXAMPLE_CONFIG });
     const provider = new FakeEmailProvider();
-    t.db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] } });
+    t.db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "Mai", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] }, trustTier: "assisted" });
     t.db.settings.patch({ outboundEnabled: true, quietHours: null, sendRatePerHour: 100 });
     const sender = new Sender({ config: t.config, db: t.db, bus: t.bus, provider, pollIntervalMs: 1_000_000 });
     const approve = (to: string) => {

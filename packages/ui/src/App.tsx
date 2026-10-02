@@ -17,6 +17,7 @@ import { SetupPage } from "./pages/Setup/SetupPage.tsx";
 import { ScorecardsPage } from "./pages/Scorecards/ScorecardsPage.tsx";
 import { BriefingsPage } from "./pages/Briefings/BriefingsPage.tsx";
 import { RoutinesPage } from "./pages/Routines/RoutinesPage.tsx";
+import { ShadowPage } from "./pages/Shadow/ShadowPage.tsx";
 
 export function App() {
   const { authenticated, checking } = useAuth();
@@ -48,6 +49,7 @@ export function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/scorecards" element={<ScorecardsPage />} />
+        <Route path="/shadow" element={<ShadowPage />} />
         <Route path="/routines" element={<RoutinesPage />} />
         <Route path="*" element={<Navigate to="/inbox" replace />} />
       </Route>

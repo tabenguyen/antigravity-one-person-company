@@ -108,8 +108,8 @@ describe("Inbox lint + rejection category", () => {
     expect(chips.every((c) => c.getAttribute("aria-pressed") === "false")).toBe(true);
 
     const confirm = screen.getByRole("button", { name: /confirm reject/i }) as HTMLButtonElement;
-    fireEvent.change(screen.getByLabelText(/reason \(required\)/i), { target: { value: "Quoted a price we do not publish." } });
-    expect(confirm.disabled).toBe(true); // reason alone is not enough
+    fireEvent.change(screen.getByLabelText(/feedback for the agent/i), { target: { value: "Quoted a price we do not publish." } });
+    expect(confirm.disabled).toBe(true); // feedback alone is not enough
 
     fireEvent.click(screen.getByRole("button", { name: "Factual error" }));
     expect(screen.getByRole("button", { name: "Factual error" }).getAttribute("aria-pressed")).toBe("true");
@@ -122,11 +122,14 @@ describe("Inbox lint + rejection category", () => {
     expect(rejectBodies[0]).toEqual({ reason: "Quoted a price we do not publish.", category: "compliance" });
   });
 
-  it("category alone (no reason) cannot be confirmed either", async () => {
-    setup([item({})]);
+  it("a category alone is enough (one-click rejection) and sends no reason", async () => {
+    const { rejectBodies } = setup([item({})]);
     await screen.findByRole("heading", { level: 2, name: /lead@example.com/ });
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     fireEvent.click(screen.getByRole("button", { name: "Tone" }));
-    expect((screen.getByRole("button", { name: /confirm reject/i }) as HTMLButtonElement).disabled).toBe(true);
+    const confirm = screen.getByRole("button", { name: /confirm reject/i }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(rejectBodies).toEqual([{ category: "tone" }]));
   });
 });

@@ -351,6 +351,54 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    name: "shadow_runs",
+    up(db) {
+      // A shadow run is a bounded evaluation window over shadow-tier agents (core ShadowRun). Status, verdicts and
+      // trends are computed from outbox/audit on read; only the run itself is stored.
+      db.exec(`
+        CREATE TABLE shadow_runs (
+          id TEXT PRIMARY KEY,
+          started_at TEXT NOT NULL,
+          planned_days INTEGER NOT NULL,
+          agent_ids TEXT NOT NULL DEFAULT '[]',
+          notes TEXT,
+          ended_at TEXT
+        );
+        CREATE INDEX idx_shadow_runs_started ON shadow_runs(started_at DESC);
+      `);
+    },
+  },
+  {
+    version: 6,
+    name: "human_sent_messages",
+    up(db) {
+      // Mail the mailbox owner sent from their own mail client (Sent-folder sync, opt-in). Only mail related to a known
+      // thread or contact is stored; see core HumanSentMessage.
+      db.exec(`
+        CREATE TABLE human_sent (
+          id TEXT PRIMARY KEY,
+          external_id TEXT NOT NULL UNIQUE,
+          message_id TEXT,
+          in_reply_to TEXT,
+          "references" TEXT NOT NULL DEFAULT '[]',
+          to_address TEXT,
+          recipients TEXT NOT NULL DEFAULT '[]',
+          subject TEXT,
+          body_text TEXT NOT NULL,
+          thread_key TEXT,
+          contact_id TEXT,
+          folder TEXT,
+          sent_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_human_sent_thread ON human_sent(thread_key);
+        CREATE INDEX idx_human_sent_message_id ON human_sent(message_id);
+        CREATE INDEX idx_human_sent_sent_at ON human_sent(sent_at DESC);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteDb): void {

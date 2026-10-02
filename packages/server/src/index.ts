@@ -15,3 +15,6 @@ export { RunTokenRegistry, createAgentApi, evaluatePolicy, type AgentApiDeps } f
 export { isValidSlug, ValidationError } from "./util.ts";
 
 export * from "./admin-types.ts";
+export { runEmailDoctor, configView, type EmailDoctorReport, type EmailDoctorOptions, type DoctorCheck, type DoctorSampleView } from "./email-doctor.ts";
+export { planInbound, type InboundPlan } from "./inbound-plan.ts";
+export { ingestSentEmail, type SentIngestResult } from "./sent-sync.ts";

@@ -27,6 +27,8 @@ import { cmdReadiness, cmdSetup } from "./commands/setup.ts";
 import { cmdPromote, cmdScorecard } from "./commands/quality.ts";
 import { cmdEval, cmdRoutine } from "./commands/routines.ts";
 import { cmdBriefings, cmdKpis } from "./commands/coordination.ts";
+import { cmdShadow } from "./commands/shadow.ts";
+import { cmdEmail } from "./commands/email.ts";
 
 const HELP: Record<string, string> = {
   agent: [
@@ -58,7 +60,7 @@ const HELP: Record<string, string> = {
     "  list [--agent <id>] [--status <s>]",
     "  edit <id> [--subject <s>] [--body <b>]           (only while pending_approval)",
     "  approve <id> [--note <n>] [--reviewer <name>]    (shadow-tier agents -> held, never sent)",
-    "  reject <id> --reason <r> [--reviewer <name>]     (reason becomes agent memory)",
+    "  reject <id> --category <c> [--reason <r>] [--reviewer <name>]   (category: factual_error|tone|too_long|not_personalized|wrong_recipient|bad_timing|compliance|other; reason becomes agent memory)",
     "  retry <id>                                       (failed -> approved)",
   ].join("\n"),
   memory: [
@@ -459,13 +461,14 @@ async function cmdOutbox(argv: string[], global: GlobalFlags): Promise<void> {
       const { values, positionals } = parseArgs({
         args: rest,
         allowPositionals: true,
-        options: { reason: { type: "string" }, reviewer: { type: "string" } },
+        options: { reason: { type: "string" }, reviewer: { type: "string" }, category: { type: "string" } },
       });
       const id = positionals[0];
-      if (!id) fail("outbox reject <id> --reason <r> [--reviewer <name>]");
-      if (!values.reason) fail("--reason is required");
+      if (!id) fail("outbox reject <id> --category <c> [--reason <r>] [--reviewer <name>]");
+      if (!values.reason && !values.category) fail("--reason or --category is required");
       const { item } = await c.post<{ item: OutboxItem }>(`/v1/admin/outbox/${id}/reject`, {
         reason: values.reason,
+        category: values.category,
         reviewer: values.reviewer,
       });
       global.json ? printJson(item) : console.log(`${id} -> rejected`);
@@ -837,6 +840,10 @@ async function main(): Promise<void> {
       return await cmdKpis(commandArgs, global);
     case "briefings":
       return await cmdBriefings(commandArgs, global);
+    case "email":
+      return await cmdEmail(commandArgs, global);
+    case "shadow":
+      return await cmdShadow(commandArgs, global);
     case "--help":
     case "-h":
     default:
@@ -864,6 +871,8 @@ async function main(): Promise<void> {
           "  eval        run|list|show|suites",
           "  kpis        per-role KPIs over the last N days",
           "  briefings   list|show   (the Chief of Staff's daily digests)",
+          "  shadow      start|status|end|list   (the 2-week shadow-run evaluation)",
+          "  email       doctor   (read-only mailbox preflight; run before a shadow run)",
           "  killswitch  on|off",
           "  status",
           "  quota",

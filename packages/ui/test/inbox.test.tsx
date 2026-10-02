@@ -105,21 +105,38 @@ describe("Inbox approval flow", () => {
     expect(screen.getByText(/Practice draft/i)).toBeTruthy();
   });
 
-  it("requires a saved edit before Approve is enabled, and clears after saving", async () => {
-    setup([makeOutboxItem({ id: "ob1", agentId: "sdr-assisted", to: "a@example.com" })]);
+  it("offers Save & approve for an unsaved edit: one click saves the edit, then approves the saved version", async () => {
+    const { fetchMock } = setup([makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" })]);
     await waitFor(() => expect(screen.getByLabelText(/^body$/i)).toBeTruthy());
 
-    const approveBtn = screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement;
-    expect(approveBtn.disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText(/^body$/i), { target: { value: "Edited body text." } });
 
-    const bodyField = screen.getByLabelText(/^body$/i);
-    fireEvent.change(bodyField, { target: { value: "Edited body text." } });
-    expect(approveBtn.disabled).toBe(true);
+    const btn = screen.getByRole("button", { name: "Save & approve" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
 
-    const saveBtn = screen.getByRole("button", { name: /^save$/i });
-    fireEvent.click(saveBtn);
+    await waitFor(() => expect(screen.queryByText(/a@example.com/)).toBeNull());
+    const calls = fetchMock.mock.calls
+      .map(([u, init]) => `${(init?.method ?? "GET").toUpperCase()} ${new URL(String(u), "http://localhost").pathname}`)
+      .filter((c) => c.startsWith("PATCH") || c.endsWith("/approve"));
+    expect(calls).toEqual(["PATCH /v1/admin/outbox/ob1", "POST /v1/admin/outbox/ob1/approve"]); // edit is recorded before the verdict
+  });
 
-    await waitFor(() => expect((screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement).disabled).toBe(false));
+  it("works the queue oldest-first and moves to the next draft after a decision", async () => {
+    // The API lists newest first, so c (newest) comes first in the response and must be shown last.
+    setup([
+      makeOutboxItem({ id: "ob3", agentId: "sdr-shadow", to: "c@example.com" }),
+      makeOutboxItem({ id: "ob2", agentId: "sdr-shadow", to: "b@example.com" }),
+      makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" }),
+    ]);
+    await screen.findByRole("heading", { level: 2, name: /a@example.com/ });
+    fireEvent.keyDown(window, { key: "j" });
+    await screen.findByRole("heading", { level: 2, name: /b@example.com/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    // b was decided from the middle: the next one (c) is shown, not a jump back to the top.
+    await screen.findByRole("heading", { level: 2, name: /c@example.com/ });
   });
 
   it("approving a shadow-tier draft removes it from the pending list", async () => {
@@ -131,7 +148,7 @@ describe("Inbox approval flow", () => {
     await waitFor(() => expect(screen.queryByText(/a@example.com/)).toBeNull());
   });
 
-  it("rejecting requires a non-empty reason before it can be confirmed", async () => {
+  it("rejecting needs a category; the written feedback is optional", async () => {
     setup([makeOutboxItem({ id: "ob1", agentId: "sdr-assisted", to: "a@example.com" })]);
     await screen.findByRole("heading", { level: 2, name: /a@example.com/ });
 
@@ -139,9 +156,8 @@ describe("Inbox approval flow", () => {
     const confirmBtn = screen.getByRole("button", { name: /confirm reject/i }) as HTMLButtonElement;
     expect(confirmBtn.disabled).toBe(true);
 
-    fireEvent.change(screen.getByLabelText(/reason \(required\)/i), { target: { value: "Too aggressive a pitch." } });
-    // A rejection category is also required (structured reason for scorecards).
-    expect(confirmBtn.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/feedback for the agent/i), { target: { value: "Too aggressive a pitch." } });
+    expect(confirmBtn.disabled).toBe(true); // feedback alone is not enough: the structured category is required
     fireEvent.click(screen.getByRole("button", { name: "Tone" }));
     expect(confirmBtn.disabled).toBe(false);
 
@@ -149,10 +165,25 @@ describe("Inbox approval flow", () => {
     await waitFor(() => expect(screen.queryByText(/a@example.com/)).toBeNull());
   });
 
+  it("rejects from the keyboard: R, a number key for the category, Ctrl+Enter", async () => {
+    const { fetchMock } = setup([makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" })]);
+    await screen.findByRole("heading", { level: 2, name: /a@example.com/ });
+
+    fireEvent.keyDown(window, { key: "r" });
+    fireEvent.keyDown(window, { key: "2" }); // Tone
+    expect(screen.getByRole("button", { name: "Tone" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(window, { key: "Enter", ctrlKey: true });
+
+    await waitFor(() => expect(screen.queryByText(/a@example.com/)).toBeNull());
+    const rejectCall = fetchMock.mock.calls.find(([u]) => String(u).endsWith("/reject"))!;
+    expect(JSON.parse(String(rejectCall[1]?.body))).toEqual({ category: "tone" });
+  });
+
   it("navigates between drafts with J/K", async () => {
+    // API order is newest first; the queue is worked oldest-first, so a (listed last) is shown first.
     setup([
-      makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" }),
       makeOutboxItem({ id: "ob2", agentId: "sdr-assisted", to: "b@example.com" }),
+      makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" }),
     ]);
     await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: /a@example.com/ })).toBeTruthy());
 

@@ -36,7 +36,7 @@ export const qualityApi = {
     request<{ criteria: PromotionCriteria }>("/v1/admin/promotion-criteria", { method: "PUT", body: JSON.stringify(patch) }),
   promoteAgent: (id: string, body: { force?: boolean; note?: string } = {}) =>
     request<{ agent: Agent }>(`/v1/admin/agents/${encodeURIComponent(id)}/promote`, { method: "POST", body: JSON.stringify(body) }),
-  rejectWithCategory: (id: string, body: { reason: string; category: RejectionCategory; reviewer?: string }) =>
+  rejectWithCategory: (id: string, body: { reason?: string; category: RejectionCategory; reviewer?: string }) =>
     request<{ item: OutboxItem }>(`/v1/admin/outbox/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify(body) }),
   relint: (id: string) => request<{ item: OutboxItem }>(`/v1/admin/outbox/${encodeURIComponent(id)}/relint`, { method: "POST" }),
 };

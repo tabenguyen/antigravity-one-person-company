@@ -7,9 +7,11 @@ import fs from "node:fs";
 import { registerReadinessRoutes } from "./admin-readiness.ts";
 import { registerSetupWizardRoutes, withSetupDefaults } from "./admin-setup-wizard.ts";
 import { registerQualityRoutes } from "./admin-quality.ts";
+import { registerEmailDoctorRoutes } from "./admin-email-doctor.ts";
 import { lintOutboxItem } from "./quality/index.ts";
 import { registerRoutinesRoutes } from "./admin-routines.ts";
 import { registerCoordinationRoutes } from "./admin-coordination.ts";
+import { registerShadowRoutes } from "./admin-shadow.ts";
 import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -186,6 +188,8 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
   registerQualityRoutes(app, deps);
   registerRoutinesRoutes(app, deps);
   registerCoordinationRoutes(app, deps);
+  registerEmailDoctorRoutes(app, deps);
+  registerShadowRoutes(app, deps);
 
   // -- Agents --------------------------------------------------------------
 
@@ -425,7 +429,10 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
       // parks it in `held` (terminal) so promoting the agent later can't release it.
       const to: OutboxStatus = agent?.trustTier === "shadow" ? "held" : "approved";
       const decidedBy = parsed.data.reviewer ? `human:${parsed.data.reviewer}` : "human:admin";
-      const item = deps.db.outbox.decide(id, to, { decidedBy, decisionNote: parsed.data.note ?? null, decidedAt: new Date().toISOString() });
+      // Approving a draft that was marked "superseded" (a human already replied) is the human's explicit choice: clear the
+      // mark, otherwise the Sender's final guard would refuse it.
+      const clearSuperseded = existing.statusReason?.startsWith("superseded:") ? { statusReason: null } : {};
+      const item = deps.db.outbox.decide(id, to, { decidedBy, decisionNote: parsed.data.note ?? null, decidedAt: new Date().toISOString(), ...clearSuperseded });
       deps.db.audit.append({
         kind: to === "held" ? "outbox.held" : "outbox.approved",
         agentId: item.agentId,
@@ -566,6 +573,7 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
         error: emailHealth.ok ? null : emailHealth.error,
         lastPollAt: currentPoller()?.lastPollAt ?? null,
         lastSendAt: deps.sender?.lastSendAt ?? null,
+        sentSync: currentPoller()?.sentSync,
       },
       outboundEnabled: settings.outboundEnabled,
       outboundDisabledReason: settings.outboundDisabledReason,

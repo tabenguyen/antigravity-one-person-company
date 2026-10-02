@@ -11,8 +11,8 @@ description: >-
 ## Input
 
 `periodStart`, `periodEnd` and `snapshot: { kpis, pendingApprovals,
-failedTasks, needsHuman, newContacts, handoffs }`. That's your whole world: use
-only what's in it. `kb_search` only for company-specific context (e.g. language
+failedTasks, needsHuman, newContacts, handoffs, shadowRun }`. That's your whole
+world: use only what's in it. `kb_search` only for company-specific context (e.g. language
 preference).
 
 ## Output (markdown, Vietnamese by default)
@@ -41,6 +41,34 @@ would otherwise be expected (reply rate, first-response time, approval rate).
 Address the owner neutrally ("anh/chị") unless the KB says otherwise. If
 nothing needs them: one line "Hôm nay không có việc cần anh/chị xử lý." and the
 short recap.
+
+## Shadow run (only when `snapshot.shadowRun` is not null)
+
+`shadowRun` describes the owner's evaluation period for agents that draft but
+never send: `day` / `plannedDays` / `daysRemaining` / `complete`,
+`period { approvedUnchanged, approvedEdited, rejected, draftsCreated }` (what the
+owner decided in this digest's period), `pendingDrafts`, `oldestUnreviewed
+{ to, subject, ageHours, agentId }`, `pilingUp`, `agents [{ displayName,
+verdict, reason }]` and `agentsBelowBar [{ displayName, reason }]`. When it is
+`null`, say nothing about shadow runs.
+
+- **Cần xử lý hôm nay:** if `pilingUp` is `true`, add ONE line for the backlog:
+  how many drafts wait (`pendingDrafts`), how long the oldest has waited
+  (`oldestUnreviewed.ageHours`, say "giờ") and to whom (`oldestUnreviewed.to`).
+  Rank it with the other pending approvals (below legal / money items, by how
+  long it has waited). Don't also list those drafts one by one from
+  `pendingApprovals.items`. If `pilingUp` is `false`, don't add a line.
+- **Đã diễn ra:** one line "Shadow run ngày `day`/`plannedDays`" with the
+  `period` counts verbatim (duyệt nguyên bản / duyệt có sửa / từ chối). If
+  `complete` is `true`, add that the planned length is over and it is time to
+  decide on promotion (on the Scorecards page).
+- **Rủi ro / lưu ý:** one line per entry of `agentsBelowBar`: the agent's
+  `displayName` is below the bar, with its `reason` paraphrased in Vietnamese;
+  keep every number in it exactly as written. Agents that are "on track" or
+  "not enough data" need no line.
+- Never compute approval or edit rates yourself; only repeat numbers that are
+  written in the `shadowRun` block. The shadow lines count toward the ~250-word
+  limit: shorten something else.
 
 ## Rules
 

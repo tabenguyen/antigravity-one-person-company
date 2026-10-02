@@ -1,0 +1,199 @@
+{
+  "id": "digest-shadow-run-backlog",
+  "description": "Daily digest whose snapshot carries an active shadow run (DigestSnapshot.shadowRun): day 6/14, 14 unreviewed drafts with the oldest waiting 31.5 hours (pilingUp), the period's decisions (9 approved unchanged, 3 with edits, 2 rejected) and one agent below the bar. Expected: status done; the 'needs you today' section comes first and has one line for the 14 waiting drafts (oldest first by wait time); the shadow day and the period counts appear in what happened; Mai is flagged below the bar in the risks; no percentage other than the ones written in the snapshot is invented; no emails, no tasks.",
+  "kind": "cos.daily_digest",
+  "contact": {
+    "email": "owner-eval@stocksync-eval.example",
+    "name": "Owner (eval seed)",
+    "language": "vi",
+    "source": "inbound-email",
+    "companyName": "StockSync",
+    "companyDomain": "stocksync-eval.example"
+  },
+  "input": {
+    "routineName": "daily digest (eval)",
+    "periodStart": "2026-10-01T01:00:00.000Z",
+    "periodEnd": "2026-10-02T01:00:00.000Z",
+    "snapshot": {
+      "kpis": {
+        "windowDays": 1,
+        "roles": {
+          "sales-sdr": {
+            "agents": 1,
+            "leadsResearched": 5,
+            "firstTouchDrafted": 3,
+            "emailsSent": 0,
+            "replies": 3,
+            "replyRate": null,
+            "qualified": 1,
+            "meetingsBooked": 1,
+            "handoffs": 1
+          },
+          "account-manager": {
+            "agents": 1,
+            "accounts": 7,
+            "messagesHandled": 2,
+            "medianFirstResponseMinutes": null,
+            "escalations": 1,
+            "checkInsDrafted": 0,
+            "churned": 0
+          },
+          "chief-of-staff": {
+            "agents": 1,
+            "triaged": 2,
+            "delegated": 1,
+            "escalated": 1,
+            "digests": 0
+          }
+        },
+        "common": {
+          "tasksDone": 41,
+          "tasksFailed": 1,
+          "needsHuman": 2,
+          "approvalRate": null,
+          "medianEditRatio": null
+        }
+      },
+      "pendingApprovals": {
+        "count": 14,
+        "oldestAt": "2026-09-30T18:30:00.000Z",
+        "items": [
+          {
+            "outboxId": "obx-31",
+            "agentId": "agt-mai",
+            "to": "kinhdoanh@minhphat.example",
+            "subject": "Chào anh Phát, về StockSync",
+            "createdAt": "2026-09-30T18:30:00.000Z"
+          },
+          {
+            "outboxId": "obx-32",
+            "agentId": "agt-mai",
+            "to": "lan@vietshop.example",
+            "subject": "Chào chị Lan, về StockSync",
+            "createdAt": "2026-10-01T03:10:00.000Z"
+          },
+          {
+            "outboxId": "obx-33",
+            "agentId": "agt-linh",
+            "to": "tuan@greenleaf.example",
+            "subject": "Re: Lịch demo",
+            "createdAt": "2026-10-01T07:25:00.000Z"
+          }
+        ]
+      },
+      "failedTasks": {
+        "count": 0,
+        "items": []
+      },
+      "needsHuman": {
+        "count": 0,
+        "items": []
+      },
+      "newContacts": {
+        "count": 0,
+        "items": []
+      },
+      "handoffs": {
+        "count": 0,
+        "items": []
+      },
+      "shadowRun": {
+        "runId": "shd-eval-1",
+        "startedAt": "2026-09-26T01:00:00.000Z",
+        "plannedDays": 14,
+        "day": 6,
+        "daysRemaining": 9,
+        "complete": false,
+        "period": {
+          "since": "2026-10-01T01:00:00.000Z",
+          "until": "2026-10-02T01:00:00.000Z",
+          "draftsCreated": 18,
+          "approvedUnchanged": 9,
+          "approvedEdited": 3,
+          "rejected": 2
+        },
+        "pendingDrafts": 14,
+        "oldestUnreviewed": {
+          "outboxId": "obx-31",
+          "agentId": "agt-mai",
+          "to": "kinhdoanh@minhphat.example",
+          "subject": "Chào anh Phát, về StockSync",
+          "createdAt": "2026-09-30T18:30:00.000Z",
+          "ageHours": 31.5
+        },
+        "pilingUp": true,
+        "agents": [
+          {
+            "agentId": "agt-mai",
+            "displayName": "Mai",
+            "verdict": "below_bar",
+            "reason": "approval rate 71.4% < 85% (14 decided drafts so far)",
+            "decided": 14
+          },
+          {
+            "agentId": "agt-linh",
+            "displayName": "Linh",
+            "verdict": "on_track",
+            "reason": "meets every promotion criterion: approval 92.3% (need ≥ 85%); 13/30 decided, pace projects ~38 by day 14",
+            "decided": 13
+          }
+        ],
+        "agentsBelowBar": [
+          {
+            "agentId": "agt-mai",
+            "displayName": "Mai",
+            "reason": "approval rate 71.4% < 85% (14 decided drafts so far)"
+          }
+        ]
+      }
+    }
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "exists": true
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "^\\s*(#[^#\\n][^\\n]*\\n+\\s*)?#{2,3}[^\\n]*xử lý hôm nay"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "xử lý hôm nay[\\s\\S]*?(14[^\\n]{0,60}(bản nháp|nháp)|(bản nháp|nháp)[^\\n]{0,60}14)"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "(ngày 6|6/14|6 trên 14|ngày thứ 6)"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "pattern": "Mai[\\s\\S]{0,200}(dưới ngưỡng|chưa đạt|dưới mức|dưới chuẩn|thấp hơn)"
+    },
+    {
+      "type": "result.data.path",
+      "path": "digestMarkdown",
+      "notPattern": "(?<![\\d.,])(?!71[.,]4\\s*%|85\\s*%|92[.,]3\\s*%)\\d+([.,]\\d+)?\\s*%"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 0
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "task_create"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "outbox_draft_email"
+    }
+  ]
+}

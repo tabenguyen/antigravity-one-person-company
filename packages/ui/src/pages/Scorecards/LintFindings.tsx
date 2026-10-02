@@ -35,11 +35,18 @@ export function LintBadge({ findings }: { findings: LintFinding[] | undefined | 
 }
 
 /** Required single-choice rejection category (nothing preselected). */
-export function RejectCategoryChips({ value, onChange }: { value: RejectionCategory | null; onChange: (c: RejectionCategory) => void }) {
+export function RejectCategoryChips({ value, onChange, showKeys = false }: { value: RejectionCategory | null; onChange: (c: RejectionCategory) => void; showKeys?: boolean }) {
   return (
     <div role="group" aria-label="Rejection category" className="reject-chips">
-      {REJECTION_CATEGORY_OPTIONS.map((o) => (
-        <button key={o.value} type="button" className="reject-chip" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>
+      {REJECTION_CATEGORY_OPTIONS.map((o, i) => (
+        <button
+          key={o.value}
+          type="button"
+          className="reject-chip"
+          aria-pressed={value === o.value}
+          data-key={showKeys ? i + 1 : undefined}
+          onClick={() => onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}

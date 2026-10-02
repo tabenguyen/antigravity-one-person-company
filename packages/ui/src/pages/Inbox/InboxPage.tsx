@@ -8,7 +8,8 @@ import { useAuth } from "../../auth/AuthContext.tsx";
 import { useToast } from "../../components/Toast.tsx";
 import { relativeAge, formatDateTime } from "../../lib/time.ts";
 import type { Agent, ContactView, OutboxItem, OutboxStatus, TimelineEntry } from "../../api/types.ts";
-import { qualityApi, type RejectionCategory } from "../../api/quality.ts";
+import { qualityApi, REJECTION_CATEGORY_OPTIONS, type RejectionCategory } from "../../api/quality.ts";
+import { shadowApi } from "../../api/shadow.ts";
 import { LintBadge, LintFindings, RejectCategoryChips } from "../Scorecards/LintFindings.tsx";
 
 const HISTORY_TABS: { key: OutboxStatus; label: string }[] = [
@@ -28,13 +29,24 @@ export function InboxPage() {
   const [tab, setTab] = useState<OutboxStatus>("pending_approval");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localItems, setLocalItems] = useState<OutboxItem[] | null>(null);
+  const [agentFilter, setAgentFilter] = useState<string>("");
+  const [showAllWaiting, setShowAllWaiting] = useState(false);
+
+  // On a phone the detail sits below the list: bring it into view when a row is tapped.
+  function pick(id: string) {
+    setSelectedId(id);
+    if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 900px)").matches) {
+      document.getElementById("inbox-detail")?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }
+  }
 
   const { data, loading, error, refresh } = useApi(
-    () => api.listOutbox({ status: [tab], limit: 100 }),
-    [tab],
+    () => api.listOutbox({ status: [tab], limit: 100, ...(agentFilter ? { agentId: agentFilter } : {}) }),
+    [tab, agentFilter],
     ["outbox.drafted", "outbox.updated"],
   );
   const { data: agentsData } = useApi(() => api.listAgents(), []);
+  const { data: shadow } = useApi(() => shadowApi.overview(), [], ["shadow.updated", "outbox.updated"]);
   const { data: waitingData } = useApi(
     () => api.listTasks({ status: ["waiting_approval"], limit: 50 }),
     [],
@@ -51,8 +63,10 @@ export function InboxPage() {
   // remove an item the instant it's decided, without waiting for the SSE
   // refresh round-trip.
   useEffect(() => {
-    setLocalItems(data?.items ?? null);
-  }, [data]);
+    // The review queue is worked oldest-first so nothing starves; every other tab is a newest-first history.
+    const list = data?.items ?? null;
+    setLocalItems(list && tab === "pending_approval" ? [...list].reverse() : list);
+  }, [data, tab]);
 
   const items = localItems ?? [];
 
@@ -77,6 +91,12 @@ export function InboxPage() {
   }
 
   function removeLocally(id: string) {
+    // After deciding an item, move on to the one that followed it (not back to the top of the queue).
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx >= 0 && id === selectedId) {
+      const next = items[idx + 1] ?? items[idx - 1];
+      if (next) setSelectedId(next.id);
+    }
     setLocalItems((prev) => (prev ? prev.filter((i) => i.id !== id) : prev));
   }
 
@@ -105,10 +125,17 @@ export function InboxPage() {
         </span>
       </div>
 
+      {shadow?.active && (
+        <div className="banner banner-shadow" role="status">
+          Shadow run — day {shadow.active.day} of {shadow.active.plannedDays}: approving records your verdict, nothing is sent.{" "}
+          <Link to="/shadow">See progress</Link>
+        </div>
+      )}
+
       {waitingTasks.length > 0 && (
         <div className="card decision-panel" aria-label="Tasks waiting for your decision">
           <h3>Tasks waiting for your decision ({waitingTasks.length})</h3>
-          {waitingTasks.map((t) => (
+          {(showAllWaiting ? waitingTasks : waitingTasks.slice(0, 2)).map((t) => (
             <div key={t.id} className="timeline-item">
               <Link to={`/tasks/${encodeURIComponent(t.id)}`}>{t.title}</Link>{" "}
               <span className="faint">
@@ -117,6 +144,11 @@ export function InboxPage() {
               {t.result?.summary && <p className="muted" style={{ margin: "2px 0 0" }}>{t.result.summary}</p>}
             </div>
           ))}
+          {waitingTasks.length > 2 && (
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setShowAllWaiting((v) => !v)}>
+              {showAllWaiting ? "Show fewer" : `Show all ${waitingTasks.length}`}
+            </button>
+          )}
         </div>
       )}
 
@@ -130,8 +162,26 @@ export function InboxPage() {
             onClick={() => setTab(t.key)}
           >
             {t.label}
+            {t.key === "pending_approval" && tab === t.key && localItems ? ` (${localItems.length})` : ""}
           </button>
         ))}
+        {(agentsData?.agents.length ?? 0) > 1 && (
+          <select
+            className="inbox-agent-filter"
+            aria-label="Filter by agent"
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+          >
+            <option value="">All agents</option>
+            {agentsData!.agents
+              .filter((a) => a.status !== "archived")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.displayName}
+                </option>
+              ))}
+          </select>
+        )}
       </div>
 
       {error && <p className="form-error">{error}</p>}
@@ -147,7 +197,7 @@ export function InboxPage() {
                 key={item.id}
                 type="button"
                 className={`inbox-row ${item.id === selectedId ? "selected" : ""}`}
-                onClick={() => setSelectedId(item.id)}
+                onClick={() => pick(item.id)}
               >
                 <div className="inbox-row-top">
                   <span>
@@ -271,17 +321,23 @@ function InboxDetail({
   }
 
   async function approve() {
-    if (dirty) {
-      notify("Save your edits before approving.", "error");
-      return;
-    }
     if (blockingLint > 0) {
       notify("Fix the blocking issues listed below (edit + save), or reject the draft.", "error");
       return;
     }
-    if (deciding) return;
+    if (deciding || saving) return;
     setDeciding(true);
     try {
+      if (dirty) {
+        // "Edited then approved" is one step: save the edit (recorded for the edit-rate) and approve the saved version.
+        const { item: saved } = await api.editOutbox(item.id, { subject, body });
+        onSaved(saved);
+        const stillBlocking = (saved.lint ?? []).filter((f) => f.severity === "error").length;
+        if (stillBlocking > 0) {
+          notify("Your edit was saved, but the draft now has blocking issues — fix them or reject.", "error");
+          return;
+        }
+      }
       await api.approveOutbox(item.id);
       notify(isShadow ? "Recorded as a practice approval (not sent)." : "Approved.", "success");
       onDecided(item.id);
@@ -293,10 +349,11 @@ function InboxDetail({
   }
 
   async function reject() {
-    if (!rejectReason.trim() || !rejectCategory || deciding) return;
+    if (!rejectCategory || deciding) return;
     setDeciding(true);
     try {
-      await qualityApi.rejectWithCategory(item.id, { reason: rejectReason.trim(), category: rejectCategory });
+      // Feedback is optional (the category is the required, structured part); when given it becomes agent memory.
+      await qualityApi.rejectWithCategory(item.id, { category: rejectCategory, ...(rejectReason.trim() ? { reason: rejectReason.trim() } : {}) });
       notify("Rejected.", "success");
       onDecided(item.id);
     } catch (err) {
@@ -306,6 +363,7 @@ function InboxDetail({
     }
   }
 
+  const categoryKeys = REJECTION_CATEGORY_OPTIONS.map((o, i) => ({ key: String(i + 1), handler: () => setRejectCategory(o.value) }));
   useHotkeys(
     [
       { key: "j", handler: onNext },
@@ -313,12 +371,15 @@ function InboxDetail({
       { key: "a", handler: () => void approve() },
       { key: "r", handler: () => setRejecting(true) },
       { key: "s", mod: true, handler: () => void save() },
+      // Rejecting without the mouse: R, then 1-8 picks the category, then Ctrl/Cmd+Enter confirms (works inside the feedback box too).
+      ...(rejecting ? [...categoryKeys, { key: "escape", handler: () => setRejecting(false) }] : []),
+      ...(rejecting && rejectCategory ? [{ key: "enter", mod: true, handler: () => void reject() }] : []),
     ],
     true,
   );
 
   return (
-    <div className="inbox-detail">
+    <div className="inbox-detail" id="inbox-detail">
       {isShadow && (
         <div className="banner banner-shadow" role="status">
           Practice draft — approving records your verdict; it will NOT be sent.
@@ -364,7 +425,7 @@ function InboxDetail({
         </div>
         {isPending && (
           <div className="inbox-detail-actions">
-            {dirty && <span className="muted inbox-unsaved-hint">Unsaved edits — save to approve</span>}
+            {dirty && <span className="muted inbox-unsaved-hint">Unsaved edits — approving saves them</span>}
             {!dirty && blockingLint > 0 && (
               <span className="muted inbox-unsaved-hint">Fix {blockingLint} blocking issue(s) to approve</span>
             )}
@@ -375,12 +436,10 @@ function InboxDetail({
               type="button"
               className="btn btn-primary btn-sm"
               onClick={approve}
-              disabled={dirty || deciding || blockingLint > 0}
-              title={
-                dirty ? "Save your edits before approving" : blockingLint > 0 ? "Fix blocking issues before approving" : undefined
-              }
+              disabled={deciding || saving || blockingLint > 0}
+              title={blockingLint > 0 ? "Fix blocking issues before approving" : dirty ? "Saves your edits, then approves" : undefined}
             >
-              Approve
+              {dirty ? "Save & approve" : "Approve"}
             </button>
             <button type="button" className="btn btn-danger btn-sm" onClick={() => setRejecting(true)} disabled={deciding}>
               Reject
@@ -423,24 +482,26 @@ function InboxDetail({
       {rejecting && (
         <div className="card" role="group" aria-label="Reject reason">
           <h3>Reject this draft</h3>
-          <p className="muted">The reason you give becomes feedback the agent sees (its memory), so be specific.</p>
-          <p className="muted">Category (required)</p>
-          <RejectCategoryChips value={rejectCategory} onChange={setRejectCategory} />
+          <p className="muted">
+            Pick a category (<span className="kbd">1</span>–<span className="kbd">8</span>) and confirm with <span className="kbd">⌘/Ctrl</span>+<span className="kbd">Enter</span>.
+            Written feedback is optional but is what the agent learns from.
+          </p>
+          <RejectCategoryChips value={rejectCategory} onChange={setRejectCategory} showKeys />
           <div className="field">
-            <label htmlFor="reject-reason">Reason (required)</label>
+            <label htmlFor="reject-reason">Feedback for the agent (optional)</label>
             <textarea
               id="reject-reason"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              rows={3}
-              autoFocus
+              rows={2}
+              placeholder="What should it do differently next time?"
             />
           </div>
           <div className="modal-actions">
             <button type="button" className="btn" onClick={() => setRejecting(false)}>
               Cancel
             </button>
-            <button type="button" className="btn btn-danger" onClick={reject} disabled={!rejectReason.trim() || !rejectCategory || deciding}>
+            <button type="button" className="btn btn-danger" onClick={reject} disabled={!rejectCategory || deciding}>
               Confirm reject
             </button>
           </div>

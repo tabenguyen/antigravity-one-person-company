@@ -152,25 +152,102 @@ function pct(x: number): string {
   return `${Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1)}%`;
 }
 
+export type CriterionCode = "decided" | "approval_rate" | "edit_ratio" | "compliance" | "lint_rate";
+
+/** One promotion criterion evaluated against a scorecard. Single source of truth for promotion and shadow-run progress. */
+export interface CriterionCheck {
+  code: CriterionCode;
+  label: string;
+  /** Observed value (a count for decided/compliance, a 0..1 fraction otherwise); null when there is no data. */
+  value: number | null;
+  target: number;
+  /** ">=" = value must reach the target, "<=" = value must stay under it. */
+  op: ">=" | "<=";
+  /** no_data: nothing to judge yet. unmet: judged and failing (or, for `decided`, not enough volume yet). */
+  status: "met" | "unmet" | "no_data";
+  /** Human-readable reason when the criterion blocks promotion; null when it does not. */
+  message: string | null;
+}
+
+export function checkCriteria(
+  sc: Pick<AgentScorecard, "decided" | "approvalRate" | "medianEditRatio" | "rejectionsByCategory" | "lintErrorRate">,
+  c: PromotionCriteria,
+): CriterionCheck[] {
+  const checks: CriterionCheck[] = [];
+  const decidedOk = sc.decided >= c.minDecided;
+  checks.push({
+    code: "decided",
+    label: "Decided drafts",
+    value: sc.decided,
+    target: c.minDecided,
+    op: ">=",
+    status: decidedOk ? "met" : "unmet",
+    message: decidedOk ? null : `decided drafts ${sc.decided} < ${c.minDecided}`,
+  });
+  const approvalBad = sc.approvalRate !== null && sc.approvalRate < c.minApprovalRate;
+  checks.push({
+    code: "approval_rate",
+    label: "Approval rate",
+    value: sc.approvalRate,
+    target: c.minApprovalRate,
+    op: ">=",
+    status: sc.approvalRate === null ? "no_data" : approvalBad ? "unmet" : "met",
+    message:
+      sc.approvalRate === null
+        ? "approval rate n/a (no decisions yet)"
+        : approvalBad
+          ? `approval rate ${pct(sc.approvalRate)} < ${pct(c.minApprovalRate)}`
+          : null,
+  });
+  const editBad = sc.medianEditRatio !== null && sc.medianEditRatio > c.maxMedianEditRatio;
+  checks.push({
+    code: "edit_ratio",
+    label: "Median edit ratio",
+    value: sc.medianEditRatio,
+    target: c.maxMedianEditRatio,
+    op: "<=",
+    status: sc.medianEditRatio === null ? "no_data" : editBad ? "unmet" : "met",
+    message:
+      sc.medianEditRatio === null
+        ? "median edit ratio n/a (no approved drafts yet)"
+        : editBad
+          ? `median edit ratio ${pct(sc.medianEditRatio)} > ${pct(c.maxMedianEditRatio)}`
+          : null,
+  });
+  const compliance = sc.rejectionsByCategory.compliance ?? 0;
+  const complianceBad = compliance > c.maxComplianceRejections;
+  checks.push({
+    code: "compliance",
+    label: "Compliance rejections",
+    value: compliance,
+    target: c.maxComplianceRejections,
+    op: "<=",
+    status: complianceBad ? "unmet" : "met",
+    message: complianceBad ? `compliance rejections ${compliance} > ${c.maxComplianceRejections}` : null,
+  });
+  const lintBad = sc.lintErrorRate !== null && sc.lintErrorRate > c.maxLintErrorsRate;
+  checks.push({
+    code: "lint_rate",
+    label: "Lint error rate",
+    value: sc.lintErrorRate,
+    target: c.maxLintErrorsRate,
+    op: "<=",
+    status: sc.lintErrorRate === null ? "no_data" : lintBad ? "unmet" : "met",
+    // No drafts yet is not a reason to block promotion on its own (decided/approval already cover it).
+    message: lintBad ? `lint error rate ${pct(sc.lintErrorRate!)} > ${pct(c.maxLintErrorsRate)}` : null,
+  });
+  return checks;
+}
+
 export function evaluatePromotion(
   sc: Pick<AgentScorecard, "decided" | "approvalRate" | "medianEditRatio" | "rejectionsByCategory" | "lintErrorRate">,
   c: PromotionCriteria,
 ): { eligible: boolean; unmet: string[] } {
-  const unmet: string[] = [];
-  if (sc.decided < c.minDecided) unmet.push(`decided drafts ${sc.decided} < ${c.minDecided}`);
-  if (sc.approvalRate === null) unmet.push("approval rate n/a (no decisions yet)");
-  else if (sc.approvalRate < c.minApprovalRate) unmet.push(`approval rate ${pct(sc.approvalRate)} < ${pct(c.minApprovalRate)}`);
-  if (sc.medianEditRatio === null) unmet.push("median edit ratio n/a (no approved drafts yet)");
-  else if (sc.medianEditRatio > c.maxMedianEditRatio) {
-    unmet.push(`median edit ratio ${pct(sc.medianEditRatio)} > ${pct(c.maxMedianEditRatio)}`);
-  }
-  const compliance = sc.rejectionsByCategory.compliance ?? 0;
-  if (compliance > c.maxComplianceRejections) unmet.push(`compliance rejections ${compliance} > ${c.maxComplianceRejections}`);
-  if (sc.lintErrorRate !== null && sc.lintErrorRate > c.maxLintErrorsRate) {
-    unmet.push(`lint error rate ${pct(sc.lintErrorRate)} > ${pct(c.maxLintErrorsRate)}`);
-  }
+  const unmet = checkCriteria(sc, c).flatMap((k) => (k.message ? [k.message] : []));
   return { eligible: unmet.length === 0, unmet };
 }
+
+export { pct as formatPct };
 
 // ---------------------------------------------------------------------------
 // Scorecard
@@ -197,6 +274,23 @@ export function summarizeDecisions(items: readonly OutboxItem[]) {
   };
 }
 
+/**
+ * Lint error counts over a set of drafts: drafts that carry an "error" finding plus drafts the lint gate blocked
+ * at draft time (outbox.lint_blocked audit rows). `rate` = errors / (drafts + blocked attempts), null when both are 0.
+ */
+export function lintErrorStats(
+  db: Db,
+  agentId: string,
+  items: readonly OutboxItem[],
+  inWindow: (at: string) => boolean,
+  sinceIso?: string,
+): { errors: number; blocked: number; draftsWithErrors: number; rate: number | null } {
+  const blocked = db.audit.list({ agentId, kind: ["outbox.lint_blocked"], ...(sinceIso ? { since: sinceIso } : {}) }).filter((e) => inWindow(e.at)).length;
+  const draftsWithErrors = items.filter((i) => i.lint.some((f) => f.severity === "error")).length;
+  const denom = items.length + blocked;
+  return { errors: draftsWithErrors + blocked, blocked, draftsWithErrors, rate: denom > 0 ? (draftsWithErrors + blocked) / denom : null };
+}
+
 export function computeScorecard(
   db: Db,
   agent: Agent,
@@ -204,9 +298,30 @@ export function computeScorecard(
   criteria: PromotionCriteria = loadCriteria(db),
   now: Date = new Date(),
 ): AgentScorecard {
-  const sinceIso = new Date(now.getTime() - days * 24 * 3_600_000).toISOString();
+  return computeScorecardWindow(db, agent, { since: new Date(now.getTime() - days * 24 * 3_600_000), windowDays: days }, criteria);
+}
+
+export interface ScorecardWindow {
+  since: Date;
+  /** Exclusive-ish upper bound (inclusive in practice); open-ended when omitted. A finished shadow run passes its end. */
+  until?: Date;
+  /** Reported as `windowDays` on the scorecard. */
+  windowDays: number;
+}
+
+/** Scorecard over an arbitrary [since, until] window (cohorted by createdAt, like the rolling-days version). */
+export function computeScorecardWindow(
+  db: Db,
+  agent: Agent,
+  window: ScorecardWindow,
+  criteria: PromotionCriteria = loadCriteria(db),
+): AgentScorecard {
+  const days = window.windowDays;
+  const sinceIso = window.since.toISOString();
+  const untilIso = window.until?.toISOString() ?? null;
+  const inWindow = (at: string) => at >= sinceIso && (untilIso === null || at <= untilIso);
   const allItems = db.outbox.list({ agentId: agent.id });
-  const items = allItems.filter((i) => i.createdAt >= sinceIso);
+  const items = allItems.filter((i) => inWindow(i.createdAt));
 
   const { rejectedItems, approved, rejected, decided, approvalRate, ratios, medianEditRatio } = summarizeDecisions(items);
   const editedRate = ratios.length > 0 ? ratios.filter((r) => r > 0).length / ratios.length : null;
@@ -217,10 +332,8 @@ export function computeScorecard(
     rejectionsByCategory[cat] = (rejectionsByCategory[cat] ?? 0) + 1;
   }
 
-  const lintBlocked = db.audit.list({ agentId: agent.id, kind: ["outbox.lint_blocked"], since: sinceIso }).length;
-  const draftsWithErrors = items.filter((i) => i.lint.some((f) => f.severity === "error")).length;
-  const lintDenom = items.length + lintBlocked;
-  const lintErrorRate = lintDenom > 0 ? (draftsWithErrors + lintBlocked) / lintDenom : null;
+  const lint = lintErrorStats(db, agent.id, items, inWindow, sinceIso);
+  const lintErrorRate = lint.rate;
 
   const reviewMinutes = items
     .filter((i) => isHuman(i) && i.decidedAt !== null)
@@ -243,7 +356,7 @@ export function computeScorecard(
   const replies = db.inbound
     .list({ classification: "reply" })
     .filter((e) => {
-      if (e.receivedAt < sinceIso) return false;
+      if (!inWindow(e.receivedAt)) return false;
       if (e.threadKey && threadKeys.has(e.threadKey)) return true;
       if (e.inReplyTo && messageIds.has(e.inReplyTo)) return true;
       if (e.references.some((r) => messageIds.has(r))) return true;
@@ -252,7 +365,7 @@ export function computeScorecard(
     }).length;
   const replyRate = sent > 0 ? Math.min(1, replies / sent) : null;
 
-  const tasks = db.tasks.list({ agentId: agent.id }).filter((t) => t.createdAt >= sinceIso);
+  const tasks = db.tasks.list({ agentId: agent.id }).filter((t) => inWindow(t.createdAt));
   const taskCounts = {
     done: tasks.filter((t) => t.status === "done").length,
     failed: tasks.filter((t) => t.status === "failed").length,

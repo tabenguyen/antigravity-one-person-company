@@ -24,6 +24,8 @@ export function SettingsPage() {
   const [autonomousRequiresPriorApproval, setAutonomousRequiresPriorApproval] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The form renders only once its fields hold the loaded settings, so an early Save can't submit the defaults.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -39,6 +41,7 @@ export function SettingsPage() {
     setDefaultAmAgentId(s.defaultAmAgentId ?? "");
     setDefaultCosAgentId(s.defaultCosAgentId ?? "");
     setAutonomousRequiresPriorApproval(s.autonomousRequiresPriorApproval);
+    setLoaded(true);
   }, [data]);
 
   function validate(): string | null {
@@ -85,7 +88,7 @@ export function SettingsPage() {
   }
 
   if (error) return <p className="form-error">{error}</p>;
-  if (!data) return <p className="empty-state">Loading…</p>;
+  if (!data || !loaded) return <p className="empty-state">Loading…</p>;
 
   return (
     <div>

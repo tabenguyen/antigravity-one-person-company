@@ -35,6 +35,9 @@ export type StoredEmailSettings =
       smtp: StoredMailServer;
       mailbox: string;
       sentFolder: string | null;
+      /** Optional for settings saved before Sent sync existed. */
+      syncSent?: boolean;
+      initialSyncDays?: number;
       pollIntervalMs: number;
       updatedAt: string;
     }
@@ -115,6 +118,8 @@ export function buildStored(input: ParsedEmailInput, prev: StoredEmailSettings |
     smtp: mergeServer(input.smtp, prevImap?.smtp ?? null, box, AAD_SMTP),
     mailbox: input.mailbox,
     sentFolder: input.sentFolder,
+    syncSent: input.syncSent,
+    initialSyncDays: input.initialSyncDays,
     pollIntervalMs: input.pollIntervalMs,
     updatedAt,
   };
@@ -134,6 +139,8 @@ export function storedToConfig(stored: StoredEmailSettings, fileEmail: EmailConf
     smtp: { host: stored.smtp.host, port: stored.smtp.port, secure: stored.smtp.secure, user: stored.smtp.user, pass: env.smtp ?? box.tryDecrypt(stored.smtp.passEnc, AAD_SMTP) ?? "" },
     mailbox: stored.mailbox,
     sentFolder: stored.sentFolder,
+    ...(stored.syncSent !== undefined ? { syncSent: stored.syncSent } : {}),
+    ...(stored.initialSyncDays !== undefined ? { initialSyncDays: stored.initialSyncDays } : {}),
     pollIntervalMs: stored.pollIntervalMs,
   };
 }
@@ -203,6 +210,8 @@ export function buildView(resolved: ResolvedEmail, env: PasswordEnv): EmailSetti
     smtp: server(config.smtp),
     mailbox: config.mailbox ?? "INBOX",
     sentFolder: config.sentFolder ?? null,
+    syncSent: config.syncSent ?? false,
+    initialSyncDays: config.initialSyncDays ?? 0,
     pollIntervalMs: config.pollIntervalMs,
   };
 }

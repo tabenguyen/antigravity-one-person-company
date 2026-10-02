@@ -1,4 +1,4 @@
-export { openDb } from "./db.ts";
+export { openDb, openDbSnapshot } from "./db.ts";
 export type { Db } from "./db.ts";
 
 export { TaskTransitionError, NotFoundError, OutboxTransitionError, ConflictError } from "./errors.ts";
@@ -12,6 +12,8 @@ export type { UpsertCompanyInput, UpsertContactInput, FindContactQuery } from ".
 export type { CreateDraftInput, ListOutboxFilter, DecidePatch, EditPatch } from "./repos/outbox.ts";
 export type { QuotaSnapshot } from "./repos/quota.ts";
 export type { CreateBriefingInput } from "./repos/briefings.ts";
+export type { CreateShadowRunInput } from "./repos/shadowRuns.ts";
+export type { CreateHumanSentInput } from "./repos/humanSent.ts";
 export type { CreateRoutineInput, UpdateRoutineInput } from "./repos/routines.ts";
 export { summarizeResults } from "./repos/evalRuns.ts";
 export type { CreateInboundInput, ListInboundFilter, SetStatusPatch } from "./repos/inbound.ts";

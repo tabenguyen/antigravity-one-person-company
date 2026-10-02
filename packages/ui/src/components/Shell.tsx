@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/inbound", label: "Inbound" },
   { to: "/knowledge", label: "Knowledge" },
   { to: "/memory", label: "Memory" },
+  { to: "/shadow", label: "Shadow run" },
   { to: "/scorecards", label: "Scorecards" },
   { to: "/routines", label: "Routines" },
   { to: "/setup", label: "Setup" },

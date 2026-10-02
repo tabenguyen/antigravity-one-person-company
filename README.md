@@ -84,6 +84,8 @@ assisted    → soạn nháp, BẠN duyệt mới gửi
 autonomous  → tự gửi trong giới hạn (chỉ khi scorecard đủ tốt và bạn tự tay nâng cấp)
 ```
 
+Hai tuần shadow đầu tiên có sẵn runbook riêng, từ checklist trước ngày 1 tới quyết định thăng cấp: [`docs/SHADOW-RUN.md`](docs/SHADOW-RUN.md).
+
 Và vài lớp an toàn khác, có sẵn:
 
 - **Công tắc khẩn cấp (kill switch)** — outbound tắt mặc định; tự ngắt nếu tỷ lệ email bị trả về vượt ngưỡng.
@@ -131,7 +133,7 @@ Mở `http://127.0.0.1:7317`, dán admin token trong file `data/admin-token`, r�
 npm run hq -- agent create sdr-01 --role sales-sdr --display-name Mai
 ```
 
-4. Để Mai chạy ở chế độ shadow vài ngày, xem điểm trong **Scorecards**, rồi bật outbound khi bạn thấy yên tâm:
+4. Để Mai chạy ở chế độ shadow khoảng 2 tuần (`npm run hq -- shadow start`), theo dõi ngày N/M và kết luận từng nhân viên trên Dashboard, xem điểm trong **Scorecards**, rồi bật outbound khi bạn thấy yên tâm. Quy trình từng ngày, từng tuần và cách quyết định thăng cấp: [`docs/SHADOW-RUN.md`](docs/SHADOW-RUN.md).
 
 ```bash
 npm run hq -- killswitch on

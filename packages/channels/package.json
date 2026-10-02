@@ -3,15 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@agyhq/core": "*",
     "imapflow": "^1.0.190",
-    "nodemailer": "^7.0.0",
-    "mailparser": "^3.7.0"
+    "mailparser": "^3.7.0",
+    "nodemailer": "^7.0.0"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.4.0",
     "@types/nodemailer": "^7.0.0",
-    "@types/mailparser": "^3.4.0"
+    "@types/smtp-server": "^3.5.13",
+    "hoodiecrow-imap": "^2.1.0",
+    "smtp-server": "^3.19.16"
   }
 }

@@ -11,6 +11,7 @@ import { newMessageId } from "@agyhq/channels";
 import type { AgyhqConfig } from "./config.ts";
 import type { EventBus } from "./event-bus.ts";
 import { effectiveSender, type EffectiveSender } from "./setup/sender-settings.ts";
+import { SUPERSEDED_PREFIX } from "./sent-sync.ts";
 
 export interface SenderDeps {
   config: AgyhqConfig;
@@ -212,6 +213,11 @@ export class Sender {
     const { db } = this.#deps;
     const agent = db.agents.get(item.agentId);
     if (!agent || agent.status === "archived") return "agent is archived or no longer exists";
+    // Shadow-tier agents NEVER send. A human "approving" their draft parks it in `held`, so an `approved` item should
+    // not exist for one — unless the agent was demoted to shadow after the approval. Refuse either way.
+    if (agent.trustTier === "shadow") return "agent is in the shadow tier: shadow drafts are never sent";
+    // A human already answered this person from their own mail client after this draft was written (Sent-folder sync).
+    if (item.statusReason?.startsWith(SUPERSEDED_PREFIX)) return item.statusReason;
     const contact = db.crm.findContacts({ email: item.to })[0] ?? null;
     if (contact) {
       const attrs = contact.attributes ?? {};

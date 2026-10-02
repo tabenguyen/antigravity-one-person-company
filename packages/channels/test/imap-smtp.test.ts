@@ -48,7 +48,7 @@ describe("ImapSmtpProvider — fetchNew cursor logic", () => {
 
     const result = await provider.fetchNew(null);
     expect(result.messages).toEqual([]);
-    expect(result.cursor).toBe("100:9");
+    expect(result.cursor).toMatch(/^100:9:\d+$/);
   });
 
   it("fetches by UID range with { uid: true, source: true } (imapflow issues BODY.PEEK for this)", async () => {
@@ -69,11 +69,11 @@ describe("ImapSmtpProvider — fetchNew cursor logic", () => {
     });
 
     const result = await provider.fetchNew("100:9", { limit: 2 });
-    expect(fetchCalls).toEqual([{ range: "10:11", query: { uid: true, source: true } }]);
+    expect(fetchCalls).toEqual([{ range: "10:11", query: { uid: true, source: true, internalDate: false } }]);
     expect(result.messages).toHaveLength(2);
     expect(result.messages[0]!.from!.address).toBe("jane@acme.com");
     expect(result.messages[1]!.from!.address).toBe("a.nguyen@congty.vn");
-    expect(result.cursor).toBe("100:11");
+    expect(result.cursor).toMatch(/^100:11:\d+$/);
   });
 
   it("only returns up to `limit` messages per call, resuming from the last UID actually seen on the next call", async () => {
@@ -93,7 +93,7 @@ describe("ImapSmtpProvider — fetchNew cursor logic", () => {
 
     const first = await provider.fetchNew("100:9", { limit: 1 });
     expect(first.messages).toHaveLength(1);
-    expect(first.cursor).toBe("100:10");
+    expect(first.cursor).toBe("100:10"); // not caught up: a legacy cursor without a timestamp stays without one
 
     const second = await provider.fetchNew(first.cursor, { limit: 1 });
     expect(second.messages).toHaveLength(1);
@@ -114,7 +114,7 @@ describe("ImapSmtpProvider — fetchNew cursor logic", () => {
     });
 
     const result = await provider.fetchNew("100:11");
-    expect(result.cursor).toBe("200:4");
+    expect(result.cursor).toMatch(/^200:4:\d+$/);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -140,7 +140,7 @@ describe("ImapSmtpProvider — fetchNew cursor logic", () => {
     });
 
     const result = await provider.fetchNew(null);
-    expect(result.cursor).toBe("100:0");
+    expect(result.cursor).toMatch(/^100:0:\d+$/);
     expect(client.connect).toHaveBeenCalledTimes(2);
     expect(client.logout).toHaveBeenCalledTimes(1);
   });
