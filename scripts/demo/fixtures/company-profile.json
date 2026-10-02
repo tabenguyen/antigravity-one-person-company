@@ -1,0 +1,17 @@
+{
+  "companyName": "BookNhanh",
+  "website": "https://booknhanh.example",
+  "oneLiner": "BookNhanh giúp spa, salon, phòng khám nhận đặt lịch online và tự nhắc lịch khách qua Zalo/SMS để giảm khách bỏ hẹn.",
+  "productDescription": "Phần mềm đặt lịch hẹn cho cơ sở dịch vụ: trang đặt lịch online, lịch theo từng nhân viên/chi nhánh, nhắc lịch tự động qua Zalo và SMS trước giờ hẹn 1 ngày và 2 tiếng (khách xác nhận hoặc dời lịch ngay trong tin nhắn), nhập lịch từ Excel.",
+  "targetCustomers": "Spa, salon tóc/nail, phòng khám nha khoa, phòng gym/yoga tại Việt Nam, 1–10 chi nhánh, đang nhận lịch thủ công qua Facebook/Zalo/Excel.",
+  "painPoints": "- Khách đặt rồi quên, ghế trống giờ cao điểm.\n- Lịch nằm rải rác ở Zalo, Facebook, sổ tay.\n- Nhiều chi nhánh khó xem lịch chung.",
+  "differentiators": "- Nhắc lịch qua Zalo có nút xác nhận/dời lịch.\n- Gom lịch nhiều chi nhánh.\n- Cài đặt trong 10 phút.",
+  "pricingPolicy": "Giá chưa gồm VAT:\n- Gói Cơ bản: 290.000đ/tháng, 1 chi nhánh.\n- Gói Chuỗi: 790.000đ/tháng, tối đa 3 chi nhánh.\nKhông giới hạn lượt nhắc. Agent không được đưa giảm giá ngoài bảng giá.",
+  "proofPoints": "Video demo 3 phút: booknhanh.example/video.",
+  "forbiddenClaims": "Không hứa \"giảm 100% khách bỏ hẹn\".\nKhông nêu tên khách hàng chưa được phép.",
+  "meetingLink": "https://booknhanh.example/demo",
+  "languages": [
+    "vi",
+    "en"
+  ]
+}

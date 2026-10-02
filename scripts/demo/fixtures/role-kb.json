@@ -1,0 +1,17 @@
+{
+  "role": "sales-sdr",
+  "files": [
+    {
+      "relPath": "icp.md",
+      "body": "# ICP\n\nSpa, salon, phòng khám 1–10 chi nhánh ở Việt Nam, nhận lịch thủ công.\n"
+    },
+    {
+      "relPath": "sales-playbook.md",
+      "body": "# Playbook\n\nMở bằng nỗi đau khách quên lịch hẹn. Mời demo 15 phút.\n"
+    },
+    {
+      "relPath": "objection-handling.md",
+      "body": "# Xử lý từ chối\n\n- \"Đang dùng Excel\": gửi video phần nhập từ Excel.\n- \"Đắt\": so với một lượt khách bỏ hẹn mỗi tuần.\n"
+    }
+  ]
+}
