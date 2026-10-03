@@ -286,8 +286,21 @@ export interface OutboxItem {
   lint: LintFinding[];
   /** Set when rejected by a human. */
   rejectionCategory: RejectionCategory | null;
+  /** How many times the agent rewrote this draft in place while it was still pending (same task, same recipient). */
+  revisions: number;
   createdAt: Iso;
   updatedAt: Iso;
+}
+
+/**
+ * `decidedBy` of a pending draft the daemon closed because the agent wrote a newer one for the same thread
+ * (see `outbox_draft_email`). Not a human verdict: scorecards, shadow-run stats and KPIs leave these out entirely.
+ */
+export const SUPERSEDED_DECIDED_BY = "policy:superseded";
+
+/** True for a draft that was replaced by a newer one for the same thread (status `rejected`, decided by policy). */
+export function isReplacedDraft(item: Pick<OutboxItem, "status" | "decidedBy">): boolean {
+  return item.status === "rejected" && item.decidedBy === SUPERSEDED_DECIDED_BY;
 }
 
 // ---------------------------------------------------------------------------
@@ -397,6 +410,8 @@ export type AuditKind =
   | "contact.handoff"
   | "email.human_sent"
   | "outbox.superseded"
+  | "outbox.revised"
+  | "outbox.draft_refused"
   | "email.test_sent"
   | "briefing.created"
   | "shadow.started"

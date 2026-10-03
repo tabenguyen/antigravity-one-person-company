@@ -8,6 +8,14 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Duplicate drafts**: `outbox_draft_email` keeps one live draft per email. A second draft for the same task and
+  recipient rewrites the pending one in place (`revisions`, audit `outbox.revised`) or is refused once it was reviewed;
+  a draft from another task on the same thread supersedes an older pending one only when the contact wrote since,
+  otherwise it is refused. Scorecards, shadow-run stats and KPIs count each email once and ignore superseded drafts.
+  The tool result now says that a saved draft is queued and its warnings are notes for the reviewer.
+
 ## [0.1.0] - 2026-10-02
 
 First public release: run a one-person company with AI employees on the

@@ -4,7 +4,7 @@
 // Definitions: see the "Shadow run" block in admin-types.ts.
 
 import type { Agent, OutboxItem, PromotionCriteria, RejectionCategory, ShadowRun } from "@agyhq/core";
-import { DEFAULT_SHADOW_PLANNED_DAYS } from "@agyhq/core";
+import { DEFAULT_SHADOW_PLANNED_DAYS, isReplacedDraft } from "@agyhq/core";
 import { ConflictError, type Db } from "@agyhq/db";
 import type {
   ShadowAgentStatus,
@@ -228,7 +228,7 @@ function agentStatus(db: Db, agent: Agent, run: ShadowRun, win: ReturnType<typeo
   const until = run.endedAt ? new Date(run.endedAt) : undefined;
   const sc = computeScorecardWindow(db, agent, { since: new Date(run.startedAt), until, windowDays: Math.round(win.elapsedDays * 10) / 10 }, criteria);
   const inWindow = (at: string) => at >= run.startedAt && (!run.endedAt || at <= run.endedAt);
-  const items = db.outbox.list({ agentId: agent.id }).filter((i) => inWindow(i.createdAt));
+  const items = db.outbox.list({ agentId: agent.id }).filter((i) => inWindow(i.createdAt) && !isReplacedDraft(i));
   const { approved } = classify(items);
 
   const approvedEdited = approved.filter((a) => a.edited);
@@ -336,7 +336,7 @@ export function buildShadowDigest(db: Db, since: Date, now: Date, status?: Shado
   let rejected = 0;
   const pending: OutboxItem[] = [];
   for (const id of run.agentIds) {
-    const items = db.outbox.list({ agentId: id }).filter((i) => i.createdAt >= run.startedAt);
+    const items = db.outbox.list({ agentId: id }).filter((i) => i.createdAt >= run.startedAt && !isReplacedDraft(i));
     draftsCreated += items.filter((i) => i.createdAt >= sinceIso && i.createdAt <= nowIso).length;
     const c = classify(items);
     for (const a of c.approved) if (decidedIn(a.item.decidedAt)) (a.edited ? approvedEdited++ : approvedUnchanged++);

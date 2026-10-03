@@ -105,6 +105,18 @@ describe("Inbox approval flow", () => {
     expect(screen.getByText(/Practice draft/i)).toBeTruthy();
   });
 
+  it("hints that a pending draft was revised by the agent, and flags a superseded one", async () => {
+    const { container } = setup([
+      makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com", revisions: 2 }),
+      makeOutboxItem({ id: "ob2", agentId: "sdr-shadow", to: "b@example.com", status: "rejected", decidedBy: "policy:superseded", statusReason: "superseded: replaced by a newer draft (ob3)" }),
+    ]);
+    await screen.findByRole("heading", { level: 2, name: /a@example.com/ });
+    expect(container.textContent).toContain("revised ×2");
+    expect(screen.getByText(/rewrote this draft 2 times/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Rejected" }));
+    await screen.findByText("superseded");
+  });
+
   it("offers Save & approve for an unsaved edit: one click saves the edit, then approves the saved version", async () => {
     const { fetchMock } = setup([makeOutboxItem({ id: "ob1", agentId: "sdr-shadow", to: "a@example.com" })]);
     await waitFor(() => expect(screen.getByLabelText(/^body$/i)).toBeTruthy());

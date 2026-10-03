@@ -175,7 +175,8 @@ edit without touching agent-instance state.
   `@agyhq/db`.
 - Outbound email is **draft-only**: `outbox_draft_email` creates a
   `pending_approval` row; a human approves or rejects it via `hq outbox` or
-  the admin API. Sending it is Phase 2.
+  the admin API. Sending it is Phase 2. One email = one queue item, see
+  "One draft per email" below.
 - A quota poller throttles to high-priority (inbound-reply) tasks when `agy`
   reports a model-group quota bucket below the configured floor.
 
@@ -251,6 +252,47 @@ Contract and definitions: [`docs/PHASE4.md`](PHASE4.md). Summary of what the dae
 - **UI** (`packages/ui`): role picker in New agent; default AM / CoS in Settings; contact page with owner, stage badge, "Hand off to Account Manager" and handoff history (`contact.handoff` audit rows, notes as fallback); Briefings page (`/briefings`); per-role KPI cards on the Dashboard (7/30 days, `—` for null rates); `account_review` / `daily_digest` in the routine form; structured `cos.triage` decision / `am.*` notes on the task page.
 - **CLI**: `hq kpis [--days n]`, `hq briefings [list|show <id>]`,
   `hq contact handoff <id> [--summary ...]`, `hq routine create --kind account_review|daily_digest`.
+
+## One draft per email (`outbox_draft_email`)
+
+Agents used to redraft after a lint *warning* (the first draft was already stored), so two drafts for one email
+landed in the approval queue and inflated draft counts / lowered approval rates. The server now guarantees one live
+draft per email (`packages/server/src/agent-api/outbox-draft.ts`):
+
+- **Same task, same recipient** (case-insensitive), earlier draft still `pending_approval`: it is **rewritten in
+  place** (same id, `reason` / `threadKey` / lint replaced, lint re-run on the new text, `outbox.revisions` + 1, audit
+  `outbox.revised`, SSE `outbox.updated {revised: true}`; no `outbox.drafted` row, no extra daily-limit use). The
+  agent's new text becomes the baseline for the edit ratio. The tool result has `outcome: "updated"` and a message
+  saying so. If a human already edited the pending draft the rewrite is refused (their edit is never overwritten).
+  A rewrite that fails lint with an `error` is refused ("Draft NOT created or changed") and the queued draft stays as
+  it was.
+- **Same task, same recipient, earlier draft already decided** (approved / held / rejected / sent / blocked / failed /
+  replaced): `conflict` ("already reviewed ... do not draft it again"); audit `outbox.draft_refused`. Not counted as a
+  lint failure. Different recipients in one task are independent drafts (the key is task + recipient; no template
+  drafts two emails to one person in a task).
+- **Same agent, same recipient and thread, different task, older draft still pending** (thread key defaults to
+  `contact:<recipient>`):
+  - the contact **wrote after** the older draft was queued (an inbound reply / new message; auto-replies, bounces,
+    spam and opt-outs don't count) and no human has edited the older one: the older draft is **superseded**: closed as
+    `rejected` with `decidedBy: "policy:superseded"`, `statusReason: "superseded: replaced by a newer draft (...)"`,
+    audit `outbox.superseded {by: "newer_draft", replacedBy}`. It leaves the queue (one live item), writes no agent
+    memory and is not a human verdict. Only if the new draft is itself stored un-blocked.
+  - otherwise (e.g. a follow-up or a re-created task stacked on a draft nobody reviewed, or the older draft is being
+    edited by a human): the new draft is **refused** with `conflict` and the reviewer's pending draft stays.
+  - Why supersede-or-refuse and not "always supersede": when the contact has written, the older draft answers a stale
+    state and the newest one is what the human should see; when they have not, the older draft is still the live
+    proposal (and a follow-up refers to a message that was never sent), so silently replacing a draft the reviewer may
+    be about to approve is worse than refusing the newcomer. Drafts of other agents (e.g. SDR vs AM) are never touched.
+- **Tool result** (`{item, outcome: "created" | "updated", message}`): a stored draft always says it is saved and
+  queued for the human (or blocked / approved by policy), that warnings are notes for the reviewer, and not to call
+  `outbox_draft_email` again. `error` lint findings still refuse the draft ("Draft NOT created") as before.
+- **Stats**: `isReplacedDraft` (core) = status `rejected` + `decidedBy: "policy:superseded"`. Scorecards
+  (`computeScorecardWindow`), shadow-run status / digest, KPIs and `computeStats` skip those drafts entirely (not a
+  draft, an approval or a rejection) and the daily outbox limit ignores them; an in-place rewrite is one row, so one
+  draft. Lint stats count a draft once (its latest lint). Sent-folder "superseded" annotations (a human answered from
+  their own mail client, `sent-sync.ts`) are a different mechanism and are unchanged.
+- **UI**: the Inbox row shows "revised ×N" for rewritten pending drafts and "superseded" on replaced ones (Rejected
+  tab) with a short banner in the detail pane; `OutboxItem.revisions` is in the existing outbox API payload.
 
 ## Shadow run (evaluation period)
 

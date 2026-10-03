@@ -55,5 +55,8 @@ reply, not to explain the whole product.
   no made-up customer names, no rounded-up stats.
 - That there's exactly one CTA. Two asks in one email means zero clear asks.
 
-Then `outbox_draft_email` with a `reason` describing why now (e.g. "BANT
-15/20, strong need+timeline signal from research").
+Then `outbox_draft_email` **once** with a `reason` describing why now (e.g.
+"BANT 15/20, strong need+timeline signal from research"). A "saved" result
+means the draft is queued for the human; warnings in it are notes for the
+reviewer, so do not draft again because of them. Redraft only after a
+"Draft NOT created" refusal listing `[error]` items.

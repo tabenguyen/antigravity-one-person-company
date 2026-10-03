@@ -44,6 +44,10 @@ Stop the sequence immediately (`crm_set_stage` to `nurture` or
 2. Re-read the prior touches so you don't repeat the same angle.
 3. Keep it to 2–4 sentences. No "I wanted to follow up on my previous
    email" as the entire content — add something.
-4. `outbox_draft_email` with `reason` noting the touch number and cadence
-   day (e.g. "Follow-up #3, day 7, no reply to touches 1-2").
+4. `outbox_draft_email` **once** with `reason` noting the touch number and
+   cadence day (e.g. "Follow-up #3, day 7, no reply to touches 1-2"). A
+   "saved" result means it is queued; warnings are notes for the reviewer —
+   don't draft again because of them. If the call is refused with a
+   `conflict` (an earlier draft to this contact is still waiting for the
+   reviewer), don't retry or work around it: finish and say so.
 5. `crm_add_note` logging the touch regardless of outcome.

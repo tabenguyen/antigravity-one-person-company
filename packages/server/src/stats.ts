@@ -2,6 +2,7 @@
 // over @agyhq/db — no new persistence, just queries scoped to a time window.
 
 import type { Db } from "@agyhq/db";
+import { isReplacedDraft } from "@agyhq/core";
 import type { AgyUsage, OutboxStatus, TaskStatus } from "@agyhq/core";
 import type { AgentStats } from "./admin-types.ts";
 
@@ -27,7 +28,7 @@ export function computeStats(db: Db, days: number, now: Date = new Date()): Stat
     const tasksByStatus: Partial<Record<TaskStatus, number>> = {};
     for (const t of tasks) tasksByStatus[t.status] = (tasksByStatus[t.status] ?? 0) + 1;
 
-    const outboxItems = db.outbox.list({ agentId: agent.id }).filter((i) => i.createdAt >= sinceIso);
+    const outboxItems = db.outbox.list({ agentId: agent.id }).filter((i) => i.createdAt >= sinceIso && !isReplacedDraft(i));
     const outboxByStatus: Partial<Record<OutboxStatus, number>> = {};
     for (const i of outboxItems) outboxByStatus[i.status] = (outboxByStatus[i.status] ?? 0) + 1;
 

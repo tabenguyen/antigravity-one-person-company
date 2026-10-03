@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { OUTBOX_TRANSITIONS } from "@agyhq/core";
+import { OUTBOX_TRANSITIONS, SUPERSEDED_DECIDED_BY } from "@agyhq/core";
 import type { Iso, LintFinding, OutboxChannel, OutboxItem, OutboxStatus, RejectionCategory } from "@agyhq/core";
 import { newId, nowIso } from "@agyhq/core";
 import { ConflictError, NotFoundError, OutboxTransitionError } from "../errors.ts";
@@ -30,6 +30,7 @@ interface OutboxRow {
   attempts: number;
   lint: string;
   rejection_category: string | null;
+  revisions: number;
   created_at: string;
   updated_at: string;
 }
@@ -68,6 +69,7 @@ function mapRow(row: OutboxRow): OutboxItem {
     attempts: row.attempts,
     lint: parseLint(row.lint),
     rejectionCategory: (row.rejection_category as RejectionCategory | null) ?? null,
+    revisions: row.revisions ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -83,6 +85,14 @@ export interface CreateDraftInput {
   reason: string;
   threadKey?: string | null;
   lint?: LintFinding[];
+}
+
+export interface ReviseDraftInput {
+  subject: string | null;
+  body: string;
+  reason: string;
+  threadKey: string | null;
+  lint: LintFinding[];
 }
 
 export interface ListOutboxFilter {
@@ -140,6 +150,7 @@ export class OutboxRepo {
       attempts: 0,
       lint: input.lint ?? [],
       rejectionCategory: null,
+      revisions: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -154,7 +165,7 @@ export class OutboxRepo {
             @originalSubject, @originalBody, @editedByHuman, @decidedBy, @decidedAt, @decisionNote,
             @statusReason, @messageId, @inReplyTo, @sentAt, @attempts, @lint, @createdAt, @updatedAt)`,
       )
-      .run({ ...item, editedByHuman: 0, lint: JSON.stringify(item.lint), rejectionCategory: undefined });
+      .run({ ...item, editedByHuman: 0, lint: JSON.stringify(item.lint), rejectionCategory: undefined, revisions: undefined });
     return item;
   }
 
@@ -196,6 +207,59 @@ export class OutboxRepo {
   findByMessageId(messageId: string): OutboxItem | null {
     const row = this.#db.prepare("SELECT * FROM outbox WHERE message_id = ?").get(messageId) as OutboxRow | undefined;
     return row ? mapRow(row) : null;
+  }
+
+  /** Drafts one task wrote to one recipient (case-insensitive), newest first. */
+  listByTaskAndRecipient(taskId: string, to: string): OutboxItem[] {
+    const rows = this.#db
+      .prepare(`SELECT * FROM outbox WHERE task_id = ? AND lower("to") = lower(?) ORDER BY created_at DESC, rowid DESC`)
+      .all(taskId, to) as OutboxRow[];
+    return rows.map(mapRow);
+  }
+
+  /**
+   * Rewrite a still-pending draft in place (the agent redrafted the same email): same id, so the reviewer keeps one
+   * queue item. What the agent wrote is the new baseline for the edit ratio (`original_*` follow the new text), and
+   * `revisions` counts the rewrites. Refuses once a human has edited it or it left `pending_approval`.
+   */
+  revise(id: string, input: ReviseDraftInput): OutboxItem {
+    const existing = this.get(id);
+    if (!existing) throw new NotFoundError("outbox item", id);
+    if (existing.status !== "pending_approval") {
+      throw new ConflictError(`outbox item ${id} can only be revised while pending_approval (current status: ${existing.status})`);
+    }
+    if (existing.editedByHuman) {
+      throw new ConflictError(`outbox item ${id} was edited by a human and can no longer be rewritten by the agent`);
+    }
+    const updatedAt = nowIso();
+    const revisions = existing.revisions + 1;
+    this.#db
+      .prepare(
+        `UPDATE outbox SET subject = @subject, body = @body, original_subject = @subject, original_body = @body,
+           reason = @reason, thread_key = @threadKey, lint = @lint, revisions = @revisions, updated_at = @updatedAt
+         WHERE id = @id`,
+      )
+      .run({ id, subject: input.subject, body: input.body, reason: input.reason, threadKey: input.threadKey, lint: JSON.stringify(input.lint), revisions, updatedAt });
+    return {
+      ...existing,
+      subject: input.subject,
+      body: input.body,
+      originalSubject: input.subject,
+      originalBody: input.body,
+      reason: input.reason,
+      threadKey: input.threadKey,
+      lint: input.lint,
+      revisions,
+      updatedAt,
+    };
+  }
+
+  /**
+   * Close a pending draft because a newer one for the same thread replaced it: pending_approval -> rejected, decided by
+   * `policy:superseded` (never a human verdict, so scorecards ignore it), with a `superseded: ...` reason the Inbox shows.
+   */
+  supersede(id: string, reason: string): OutboxItem {
+    return this.decide(id, "rejected", { decidedBy: SUPERSEDED_DECIDED_BY, decidedAt: nowIso(), statusReason: reason });
   }
 
   /** Has this address ever received a `sent` email that a human (not policy) approved? */

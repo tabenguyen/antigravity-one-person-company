@@ -4,7 +4,9 @@
 // Definitions (all over the window [now - days, now], cohorted by the outbox
 // item's createdAt, same as stats.ts):
 //
-//   drafts         every outbox item the agent created in the window (any status).
+//   drafts         every outbox item the agent created in the window (any status), except drafts the daemon
+//                  closed because a newer one replaced them (`isReplacedDraft`, rejected by `policy:superseded`).
+//                  An agent rewriting its own pending draft in place (`revisions`) is one item, so it is one draft.
 //   approved       items with status approved|held|sending|sent|failed AND a decidedBy
 //                  (human "human:*" or policy "policy:autonomous"): "approved" is the
 //                  decision; sending/sent/failed are just later lifecycle states of it.
@@ -33,7 +35,7 @@ import type {
   RejectionCategory,
   TrustTier,
 } from "@agyhq/core";
-import { DEFAULT_PROMOTION_CRITERIA } from "@agyhq/core";
+import { DEFAULT_PROMOTION_CRITERIA, isReplacedDraft } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
 
 export const PROMOTION_CRITERIA_KEY = "promotion_criteria";
@@ -321,7 +323,8 @@ export function computeScorecardWindow(
   const untilIso = window.until?.toISOString() ?? null;
   const inWindow = (at: string) => at >= sinceIso && (untilIso === null || at <= untilIso);
   const allItems = db.outbox.list({ agentId: agent.id });
-  const items = allItems.filter((i) => inWindow(i.createdAt));
+  // A draft replaced by a newer one for the same thread is neither a draft, an approval nor a rejection.
+  const items = allItems.filter((i) => inWindow(i.createdAt) && !isReplacedDraft(i));
 
   const { rejectedItems, approved, rejected, decided, approvalRate, ratios, medianEditRatio } = summarizeDecisions(items);
   const editedRate = ratios.length > 0 ? ratios.filter((r) => r > 0).length / ratios.length : null;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isReplacedDraft } from "@agyhq/core";
 import { openDb } from "../src/index.ts";
 import { OutboxTransitionError, ConflictError, NotFoundError } from "../src/errors.ts";
 
@@ -214,6 +215,55 @@ describe("outbox", () => {
     db.outbox.decide(a.id, "sent", { messageId: "abc123@mail.example", sentAt: new Date().toISOString() });
     expect(db.outbox.findByMessageId("abc123@mail.example")?.id).toBe(a.id);
     expect(db.outbox.findByMessageId("nope")).toBeNull();
+    db.close();
+  });
+
+  it("revise rewrites a pending draft in place: same id, new baseline, revisions counted", () => {
+    const db = openDb(":memory:");
+    withAgent(db);
+    const d = db.outbox.createDraft({ agentId: "sdr-01", taskId: "t1", channel: "email", to: "a@x.com", subject: "s1", body: "b1", reason: "r1" });
+    expect(d.revisions).toBe(0);
+    const r = db.outbox.revise(d.id, { subject: "s2", body: "b2", reason: "r2", threadKey: "contact:a@x.com", lint: [{ code: "no_cta", severity: "warn", message: "m" }] });
+    expect(r).toMatchObject({ id: d.id, subject: "s2", body: "b2", originalSubject: "s2", originalBody: "b2", reason: "r2", revisions: 1, status: "pending_approval", createdAt: d.createdAt });
+    expect(db.outbox.get(d.id)).toEqual(r);
+    expect(db.outbox.list()).toHaveLength(1);
+    expect(db.outbox.revise(d.id, { subject: "s3", body: "b3", reason: "r3", threadKey: null, lint: [] }).revisions).toBe(2);
+    db.close();
+  });
+
+  it("revise refuses a decided or human-edited draft", () => {
+    const db = openDb(":memory:");
+    withAgent(db);
+    const input = { subject: "s", body: "b", reason: "r", threadKey: null, lint: [] };
+    const decided = db.outbox.createDraft({ agentId: "sdr-01", channel: "email", to: "a@x.com", subject: "s", body: "b", reason: "r" });
+    db.outbox.decide(decided.id, "approved");
+    expect(() => db.outbox.revise(decided.id, input)).toThrow(ConflictError);
+    const edited = db.outbox.createDraft({ agentId: "sdr-01", channel: "email", to: "b@x.com", subject: "s", body: "b", reason: "r" });
+    db.outbox.edit(edited.id, { body: "human" });
+    expect(() => db.outbox.revise(edited.id, input)).toThrow(ConflictError);
+    expect(() => db.outbox.revise("nope", input)).toThrow(NotFoundError);
+    db.close();
+  });
+
+  it("supersede closes a pending draft as rejected by policy (never a human verdict)", () => {
+    const db = openDb(":memory:");
+    withAgent(db);
+    const d = db.outbox.createDraft({ agentId: "sdr-01", channel: "email", to: "a@x.com", subject: "s", body: "b", reason: "r" });
+    const s = db.outbox.supersede(d.id, "superseded: replaced by x");
+    expect(s).toMatchObject({ status: "rejected", decidedBy: "policy:superseded", statusReason: "superseded: replaced by x", rejectionCategory: null });
+    expect(isReplacedDraft(s)).toBe(true);
+    expect(isReplacedDraft({ status: "rejected", decidedBy: "human:ops" })).toBe(false);
+    expect(() => db.outbox.supersede(d.id, "again")).toThrow(OutboxTransitionError);
+    db.close();
+  });
+
+  it("listByTaskAndRecipient matches the task and the recipient case-insensitively", () => {
+    const db = openDb(":memory:");
+    withAgent(db);
+    const a = db.outbox.createDraft({ agentId: "sdr-01", taskId: "t1", channel: "email", to: "Jane@X.com", subject: "s", body: "b", reason: "r" });
+    db.outbox.createDraft({ agentId: "sdr-01", taskId: "t1", channel: "email", to: "other@x.com", subject: "s", body: "b", reason: "r" });
+    db.outbox.createDraft({ agentId: "sdr-01", taskId: "t2", channel: "email", to: "jane@x.com", subject: "s", body: "b", reason: "r" });
+    expect(db.outbox.listByTaskAndRecipient("t1", "jane@x.com").map((i) => i.id)).toEqual([a.id]);
     db.close();
   });
 });

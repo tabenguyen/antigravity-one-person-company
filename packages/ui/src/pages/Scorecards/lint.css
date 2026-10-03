@@ -54,6 +54,13 @@
   color: var(--color-warning);
 }
 
+/* "revised ×N" / "superseded" hints on an Inbox row: neutral, informational. */
+.lint-badge.lint-note {
+  border: 1px solid currentColor;
+  color: var(--color-text-muted, inherit);
+  opacity: 0.85;
+}
+
 .reject-chips {
   display: flex;
   flex-wrap: wrap;

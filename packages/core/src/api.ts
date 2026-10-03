@@ -165,7 +165,7 @@ export const McpTools = {
   },
   outbox_draft_email: {
     description:
-      "Draft an outbound email. It is NOT sent: it goes to the outbox where policy and humans decide. Returns the draft and its status.",
+      "Draft an outbound email. It is NOT sent: it goes to the outbox where policy and humans decide. Returns the draft, its status and a message saying what happened. Call it ONCE per email: a draft that is stored is already queued for the human (warnings are notes for the reviewer, not a reason to draft again); only a refusal (\"Draft NOT created\") means you should fix the draft and call again.",
     input: z.object({
       to: z.string().email(),
       subject: z.string().min(1).max(200),
@@ -194,7 +194,13 @@ export interface McpToolOutputs {
   crm_set_stage: { contact: Contact };
   task_create: { task: Task };
   contact_handoff: { contact: Contact; task: Task; fromAgentId: string | null; toAgentId: string };
-  outbox_draft_email: { item: OutboxItem };
+  outbox_draft_email: {
+    item: OutboxItem;
+    /** "created": a new draft was queued. "updated": this task's earlier pending draft to the same recipient was rewritten in place. */
+    outcome: "created" | "updated";
+    /** Plain-language account of what happened and what to do next; shown to the agent. */
+    message: string;
+  };
 }
 
 export const mcpRoute = (tool: McpToolName) => `/v1/mcp/${tool}`;

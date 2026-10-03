@@ -34,6 +34,22 @@ export function LintBadge({ findings }: { findings: LintFinding[] | undefined | 
   );
 }
 
+/** "revised ×N" (the agent rewrote this pending draft in place) / "superseded" (a newer draft replaced it). */
+export function RevisionBadge({ item }: { item: { revisions?: number; status: string; decidedBy: string | null } }) {
+  const superseded = item.status === "rejected" && item.decidedBy === "policy:superseded";
+  const revisions = item.revisions ?? 0;
+  if (!superseded && revisions === 0) return null;
+  return superseded ? (
+    <span className="lint-badge lint-note" title="Replaced by a newer draft for the same thread; not counted in scorecards">
+      superseded
+    </span>
+  ) : (
+    <span className="lint-badge lint-note" title="The agent rewrote this draft in place before review (one queue item, not a duplicate)">
+      revised ×{revisions}
+    </span>
+  );
+}
+
 /** Required single-choice rejection category (nothing preselected). */
 export function RejectCategoryChips({ value, onChange, showKeys = false }: { value: RejectionCategory | null; onChange: (c: RejectionCategory) => void; showKeys?: boolean }) {
   return (

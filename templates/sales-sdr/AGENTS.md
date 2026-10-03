@@ -58,6 +58,19 @@ truth, and a human as the only sender of anything that leaves the building.
    and lists them. Fix every listed issue and draft again — never work around
    a check. Warnings (length, missing question, language) are shown to the
    reviewer; fix them when you can.
+10. **Draft once; warnings are for the reviewer.** Call `outbox_draft_email`
+    once per email. A draft that is saved is already in the human's queue —
+    a result that says "saved" / "queued" (even with warnings such as
+    `no_cta`) means you are done with that email: do not draft it again to
+    "fix" a warning. Write it right the first time (one concrete CTA, in the
+    prospect's language, within the length limits). Draft again only when the
+    call was refused with "Draft NOT created … [error]". If you do call it
+    again for the same email in the same task, the server rewrites your
+    pending draft in place (it never creates a second one), and if the earlier
+    draft was already reviewed, or another draft to this contact is still
+    waiting for the reviewer, the call is refused with a `conflict` — don't
+    retry; say so in your summary and finish (`needs_human` if the prospect is
+    waiting on an answer).
 
 ## When in doubt
 

@@ -15,7 +15,7 @@ import { truncatedString } from "./audit-util.ts";
 import { readJsonBody } from "./body.ts";
 import type { ResolvedDeps } from "./deps.ts";
 import { handoffContact } from "../handoff.ts";
-import { formatFindings, hasLintErrors, lintNewDraft } from "../quality/index.ts";
+import { draftEmail } from "./outbox-draft.ts";
 
 const SYSTEM_MANAGED_STAGES = new Set(["contacted", "replied"]);
 
@@ -149,105 +149,7 @@ export function registerMcpRoutes(app: Hono, deps: ResolvedDeps): void {
     return result satisfies McpToolOutputs["contact_handoff"];
   });
 
-  registerTool(app, deps, "outbox_draft_email", async (ctx, input) => {
-    const now = ctx.deps.now();
-    let blockedReason: string | null = null;
-
-    const contact = ctx.db.crm.findContacts({ email: input.to })[0] ?? null;
-    if (contact) {
-      const attrs = contact.attributes ?? {};
-      const optedOutByAttribute = attrs["optOut"] === true || Boolean(attrs["doNotContact"]) || Boolean(attrs["emailBounced"]);
-      let optedOutByUnsubscribe = false;
-      if (contact.stage === "disqualified") {
-        const notes = ctx.db.crm.listRecentNotes("contact", contact.id, 20);
-        optedOutByUnsubscribe = notes.some((n) => n.body.toLowerCase().includes("unsubscribe"));
-      }
-      if (optedOutByAttribute || optedOutByUnsubscribe) {
-        blockedReason = "recipient has opted out";
-      }
-    }
-
-    if (!blockedReason) {
-      const startOfDay = new Date(now);
-      startOfDay.setUTCHours(0, 0, 0, 0);
-      const todayCount = ctx.db.outbox
-        .list({ agentId: ctx.agentId })
-        .filter((item) => item.createdAt >= startOfDay.toISOString()).length;
-      if (todayCount >= ctx.deps.outboxDailyLimit) {
-        blockedReason = `daily outbox limit (${ctx.deps.outboxDailyLimit}) reached`;
-      }
-    }
-
-    // Default to the current task's threadKey when the model doesn't pass one
-    // explicitly (observed in practice via the real-e2e test: a model asked to
-    // "handle this reply" reliably drafts a good reply but doesn't reliably
-    // thread it) — otherwise the Sender has no way to find the inbound message
-    // to set In-Reply-To/References on, breaking email threading for the
-    // recipient. Same pattern task_create already uses for its own threadKey.
-    const currentTask = ctx.db.tasks.get(ctx.taskId);
-    const threadKey = input.threadKey ?? currentTask?.threadKey ?? null;
-
-    // Draft lint (docs/PLAN.md Phase 3): an `error` finding means the draft is never created;
-    // the agent gets the findings back as a tool error, fixes the draft, and calls this again.
-    // (A draft already blocked by policy is stored regardless so the human sees why.)
-    const lint = lintNewDraft(ctx.db, {
-      agent: ctx.agent,
-      to: input.to,
-      threadKey,
-      subject: input.subject,
-      body: input.body,
-    });
-    if (!blockedReason && hasLintErrors(lint)) {
-      ctx.db.audit.append({
-        kind: "outbox.lint_blocked",
-        agentId: ctx.agentId,
-        taskId: ctx.taskId,
-        conversationId: null,
-        data: { to: input.to, subject: truncatedString(input.subject, 200), findings: lint },
-      });
-      throw new HttpError(
-        "invalid_request",
-        `Draft NOT created: it failed automatic checks. Fix every [error] below (keep to published facts and prices from kb_search), then call outbox_draft_email again.\n${formatFindings(lint)}`,
-      );
-    }
-
-    const draft = ctx.db.outbox.createDraft({
-      agentId: ctx.agentId,
-      taskId: ctx.taskId,
-      channel: "email",
-      to: input.to,
-      subject: input.subject,
-      body: input.body,
-      reason: input.reason,
-      threadKey,
-      lint,
-    });
-
-    // Outbox policy (docs/PLAN.md §3.4 trust tiers): blocked drafts stay blocked;
-    // otherwise an autonomous-tier agent is auto-approved when the daemon settings
-    // don't require prior human approval, or this recipient already got one.
-    let item = draft;
-    if (blockedReason) {
-      item = ctx.db.outbox.decide(draft.id, "blocked", { statusReason: blockedReason });
-    } else if (ctx.agent.trustTier === "autonomous") {
-      const settings = ctx.db.settings.get();
-      const priorHumanApproved = ctx.db.outbox.hasHumanApprovedSentTo(input.to);
-      if (!settings.autonomousRequiresPriorApproval || priorHumanApproved) {
-        item = ctx.db.outbox.decide(draft.id, "approved", { decidedBy: "policy:autonomous", decidedAt: now.toISOString() });
-      }
-    }
-
-    ctx.db.audit.append({
-      kind: "outbox.drafted",
-      agentId: ctx.agentId,
-      taskId: ctx.taskId,
-      conversationId: null,
-      data: { id: item.id, to: item.to, status: item.status, ...(blockedReason ? { blockedReason } : {}) },
-    });
-    ctx.deps.emit("outbox.drafted", { id: item.id, agentId: ctx.agentId, status: item.status });
-
-    return { item } satisfies McpToolOutputs["outbox_draft_email"];
-  });
+  registerTool(app, deps, "outbox_draft_email", async (ctx, input) => draftEmail(ctx, input));
 }
 
 interface ToolCtx {

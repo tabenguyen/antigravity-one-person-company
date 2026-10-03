@@ -63,7 +63,8 @@ Xem tình hình bất cứ lúc nào: card **Shadow run** trên Dashboard, trang
    | Gần ổn, sửa vài chữ | Sửa trực tiếp rồi bấm **Save & approve** (hoặc `A`): bản sửa được lưu **trước** khi duyệt, và đó chính là dữ liệu "approved with edits" dùng để đo tỷ lệ sửa. Đừng copy bản sửa đi nơi khác rồi bấm Approve bản gốc, hệ thống sẽ tưởng nháp hoàn hảo. |
    | Không dùng được | `R` rồi phím `1`–`8` chọn **nhóm lỗi** (factual error, tone, too long, not personalized, wrong recipient, bad timing, compliance, other), rồi `Ctrl/⌘+Enter`. Một dòng góp ý là tuỳ chọn nhưng **rất đáng viết**: nó thành bộ nhớ của nhân viên ("giọng hơi ép", "đừng nhắc giá khi chưa được hỏi"). |
    | Nháp bị đánh dấu lỗi lint đỏ | Sửa rồi lưu, hoặc từ chối. Lint đỏ chặn nút Approve. |
-   | Có hai bản nháp giống nhau cho cùng một người | Duyệt một, từ chối bản còn lại (nhóm `other`, ghi "trùng"). Xem mục 7. |
+   | Nháp có nhãn **revised ×N** | Agent đã viết lại bản này N lần *trước khi* bạn duyệt (cùng một việc, cùng một người). Vẫn chỉ là **một** bản trong hàng chờ; bạn đang xem bản mới nhất. Duyệt bình thường. |
+   | Nháp ở tab Rejected có nhãn **superseded** | Hệ thống tự đóng bản cũ vì khách đã nhắn lại và agent viết bản mới thay thế. Không phải phán quyết của bạn, không tính vào số liệu, không cần làm gì. |
 
    `J` / `K` chuyển giữa các nháp. Sau khi quyết định, Inbox tự nhảy sang nháp kế tiếp.
 3. **Xử lý "Tasks waiting for your decision"** ở đầu Inbox: đó là những việc agent không dám tự quyết (hoàn tiền, hợp đồng, SLA, khách giận…). Đọc, trả lời bằng tay nếu cần, rồi đánh dấu hoàn thành trong trang task.
@@ -133,7 +134,7 @@ Trong shadow, thứ tệ nhất có thể xảy ra là một bản nháp tệ n�
 
 ## 8. Lỗi đã biết ảnh hưởng tới run (xem mục Known issues trong [`PLAN.md`](PLAN.md))
 
-- **Bản nháp trùng.** Agent đôi khi soạn lại khi thấy cảnh báo lint nhẹ, nên hàng chờ có hai bản cho cùng một người (SDR bị nhiều hơn AM). Hệ quả: số "drafts" phình ra và bản từ chối trùng làm giảm tỷ lệ duyệt. Cách xử lý: duyệt một bản, từ chối bản kia (`other`, "trùng"), và khi đọc số cuối kỳ nhớ trừ những bản trùng. Chưa có sửa phía server.
+- **Bản nháp trùng: đã sửa phía server (2026-10-03).** Trước đây agent soạn lại khi thấy cảnh báo lint nhẹ nên hàng chờ có hai bản cho cùng một người. Bây giờ: (1) trong cùng một việc, lần soạn thứ hai **ghi đè tại chỗ** bản đang chờ (cùng id, nhãn "revised ×N", không thêm bản mới); nếu bản đầu đã được duyệt/giữ/từ chối thì lần soạn thứ hai bị từ chối; (2) một việc khác cho cùng người và cùng thread: nếu khách đã nhắn lại sau khi bản cũ vào hàng chờ thì bản cũ tự đóng là "superseded", còn nếu không (ví dụ follow-up chồng lên bản chưa duyệt) thì bản mới bị từ chối và bản đang chờ giữ nguyên. Số liệu (drafts, tỷ lệ duyệt, tỷ lệ sửa, KPI) chỉ đếm mỗi email một lần và không đếm bản "superseded". **Không cần từ chối bản trùng bằng tay nữa**; nếu vẫn thấy hai bản gần giống nhau cho một người, đó là hai việc khác nhau, hãy báo lại.
 - **SDR bị chặn lint "deceptive_subject".** Trả lời một người mà chưa có thread trước đó bằng tiêu đề "Re: …" bị từ chối, nên agent phải soạn lại; đôi khi thấy ở nháp đầu tiên cho thư lạ.
 - **CTA cố định.** Khoảng nửa số lần, SDR đề nghị "gọi 15 phút, em rảnh thứ Ba". Nếu bạn không muốn kiểu này, từ chối nhóm `tone` kèm góp ý để nó học, và/hoặc sửa playbook trong KB.
 - **Lint của AM có thể báo nhầm.** Tiêu đề "Re: …" chứa chữ như "refund" hoặc "uptime guarantee" (do chính khách viết) bị coi là lời hứa. Nháp bị chặn lúc soạn nên agent soạn lại; ca "message-sla-uptime-bait" vẫn đôi khi chập chờn. Tính vào số lỗi lint là bình thường.

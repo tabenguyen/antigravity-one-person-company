@@ -11,7 +11,8 @@ CRM that makes this outreach wrong), do not draft anything; update the CRM
 stage instead and explain why in your result.
 
 If a follow-up is appropriate, draft it with `outbox_draft_email` (shorter
-than the previous touch, a different angle, still exactly one CTA), then
+than the previous touch, a different angle, still exactly one CTA) — once; a
+"saved" result means it is queued and warnings are for the reviewer — then
 log it per `log-to-crm`.
 
 Finish by calling `finish` with the structured task result:

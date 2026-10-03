@@ -12,8 +12,10 @@ with one clear call to action, grounded only in what's in the knowledge
 base and the qualification summary above — don't invent anything beyond
 that. Use `kb_search` for anything you need to cite.
 
-Draft it with `outbox_draft_email` (never send directly), then log the
-touch to the CRM per `log-to-crm`.
+Draft it with `outbox_draft_email` (never send directly) — call it once: once
+it says the draft is saved, it is queued for the human and any warnings are
+notes for the reviewer, not a reason to draft again. Then log the touch to the
+CRM per `log-to-crm`.
 
 Finish by calling `finish` with the structured task result:
 - `status: "done"` once the draft is created and logged.

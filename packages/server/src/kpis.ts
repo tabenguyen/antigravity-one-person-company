@@ -5,6 +5,7 @@
 // "Phase 4 additions" block of admin-types.ts.
 
 import type { Db } from "@agyhq/db";
+import { isReplacedDraft } from "@agyhq/core";
 import type { OutboxItem } from "@agyhq/core";
 import type { AmKpis, CommonKpis, CosKpis, KpiReport, SdrKpis } from "./admin-types.ts";
 import { median, summarizeDecisions } from "./quality/scorecard.ts";
@@ -57,7 +58,7 @@ export function computeKpisSince(db: Db, since: Date, now: Date = new Date()): K
     tasks.filter((t) => t.role === role && t.kind === kind && (status === undefined || t.status === status)).length;
 
   // -- drafts ---------------------------------------------------------------
-  const drafts: OutboxItem[] = db.outbox.list({}).filter((i) => i.createdAt >= sinceIso);
+  const drafts: OutboxItem[] = db.outbox.list({}).filter((i) => i.createdAt >= sinceIso && !isReplacedDraft(i));
   const taskKindCache = new Map<string, string | null>();
   const kindOf = (taskId: string | null): string | null => {
     if (!taskId) return null;

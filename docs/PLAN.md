@@ -237,11 +237,16 @@ from the model's head.
   `research-out-of-icp-answers-question` drafts "Re: …" with no prior thread →
   refused by `deceptive_subject` lint; `first-touch-good-fit` about half the
   runs proposes a fixed "15-minute call, I'm free Tuesday" CTA.
-- [ ] Duplicate drafts: `outbox_draft_email` stores a draft that has only lint
-  warnings, the agent sees the warning and drafts again → two drafts in the
-  approval queue. Fixed in the AM template only; SDR still exposed. Better fix
-  is server-side (e.g. one pending draft per task/thread, or return warnings
-  without storing).
+- [x] ~~Duplicate drafts~~ — **fixed 2026-10-03**, server-side
+  (`agent-api/outbox-draft.ts`): a second draft in the same task for the same
+  recipient rewrites the pending one in place (`outbox.revised`, `revisions`),
+  and is refused (`conflict`) once the earlier one was reviewed; a draft from
+  another task on the same thread supersedes the older pending one only when
+  the contact wrote since, otherwise it is refused; scorecards, shadow stats
+  and KPIs count each email once and ignore superseded drafts. The tool result
+  now says "saved and queued; warnings are for the reviewer; don't draft
+  again", and the SDR template carries the same rule as the AM one. See
+  docs/TECHNICAL.md "One draft per email".
 - [ ] AM lint false positive: `quality/am-lint.ts` scans the subject, so
   "Re: <customer subject containing refund / uptime guarantee>" is refused.
   Lint only text the agent wrote, not the echoed subject. (The AM template

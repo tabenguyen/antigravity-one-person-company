@@ -27,8 +27,12 @@ classification determines whether you should draft anything at all.
 
 1. `crm_add_note` with the reply's substance and your classification.
 2. Update `crm_set_stage` if it changed.
-3. If you drafted a response, `outbox_draft_email` with a `reason` citing
-   the classification.
+3. If you drafted a response, `outbox_draft_email` **once** with a `reason`
+   citing the classification. A "saved" result means it is queued for the
+   human; warnings are notes for the reviewer, so don't draft again because
+   of them (redraft only after a "Draft NOT created" refusal listing
+   `[error]` items). If a conflict says the draft was already reviewed, don't
+   retry — finish and say so.
 4. Return a task result summarizing the classification and what you did —
    a human scanning task history should understand the whole exchange from
    your summary alone.

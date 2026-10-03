@@ -399,6 +399,18 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    name: "outbox_revisions",
+    up(db) {
+      // One draft per (task, recipient): a second outbox_draft_email call rewrites the pending draft in place and
+      // bumps this counter instead of adding a queue item. Lookups by (task, recipient) and thread stay cheap.
+      db.exec(`
+        ALTER TABLE outbox ADD COLUMN revisions INTEGER NOT NULL DEFAULT 0;
+        CREATE INDEX IF NOT EXISTS idx_outbox_task ON outbox(task_id);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteDb): void {

@@ -10,7 +10,7 @@ import { relativeAge, formatDateTime } from "../../lib/time.ts";
 import type { Agent, ContactView, OutboxItem, OutboxStatus, TimelineEntry } from "../../api/types.ts";
 import { qualityApi, REJECTION_CATEGORY_OPTIONS, type RejectionCategory } from "../../api/quality.ts";
 import { shadowApi } from "../../api/shadow.ts";
-import { LintBadge, LintFindings, RejectCategoryChips } from "../Scorecards/LintFindings.tsx";
+import { LintBadge, LintFindings, RejectCategoryChips, RevisionBadge } from "../Scorecards/LintFindings.tsx";
 
 const HISTORY_TABS: { key: OutboxStatus; label: string }[] = [
   { key: "pending_approval", label: "Pending" },
@@ -203,6 +203,7 @@ export function InboxPage() {
                   <span>
                     {agent?.displayName ?? item.agentId}
                     <LintBadge findings={item.lint} />
+                    <RevisionBadge item={item} />
                   </span>
                   <span className="faint">{relativeAge(item.createdAt)}</span>
                 </div>
@@ -388,6 +389,16 @@ function InboxDetail({
       {!outboundEnabled && isPending && (
         <div className="banner banner-warning" role="status">
           Approved emails will queue until outbound is enabled.
+        </div>
+      )}
+      {item.status === "rejected" && item.decidedBy === "policy:superseded" && (
+        <div className="banner banner-warning" role="status">
+          Superseded by a newer draft — not a reviewer verdict, not counted in scorecards. {item.statusReason}
+        </div>
+      )}
+      {item.revisions > 0 && isPending && (
+        <div className="banner banner-warning" role="status">
+          The agent rewrote this draft {item.revisions} time{item.revisions === 1 ? "" : "s"} before review; you are seeing the latest version.
         </div>
       )}
       {item.status === "blocked" && item.statusReason && (
