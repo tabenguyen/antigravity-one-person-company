@@ -8,8 +8,66 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
+Two new AI employees, hand-offs between them, and everything needed to start a
+two-week shadow run on a real mailbox. Upgrading from 0.1.0 needs no manual
+steps: the database migrates itself on daemon start. Run `npm run build` before
+restarting the daemon so agents get the updated company MCP tools.
+
+### Added
+
+- **Account Manager / Customer Success role** (`templates/account-manager`, replaces the 0.1.0 stub): onboards new
+  customers, answers questions from the knowledge base (tier-1 support), sends proactive check-ins and reviews its book
+  of accounts on a schedule. Refunds, discounts, credits, price or contract changes, SLA/uptime promises, feature or
+  bug-fix dates and cancellations always go to a human; new draft lint rules (`am_refund_promise`,
+  `am_discount_promise`, `am_credit_promise`, `am_sla_promise`, `am_delivery_promise`, `am_contract_promise`, vi + en)
+  refuse drafts that promise them.
+- **Chief of Staff role** (`templates/chief-of-staff`), internal only (never drafts customer email): triages inbound
+  mail no other agent owns and delegates it to the right agent and task, or hands it to you (prompt-injection attempts
+  included); writes a daily digest, stored as a **briefing** (new Briefings page, `GET /v1/admin/briefings`,
+  `hq briefings`).
+- **SDR → Account Manager hand-off**: the SDR calls `contact_handoff` when a prospect becomes a customer, or you click
+  "Hand off to Account Manager" on the contact page (`POST /v1/admin/contacts/:id/handoff`, `hq contact handoff`). The
+  contact becomes `customer`, its SDR follow-ups are cancelled and an onboarding task is queued. New contact stages
+  `customer` and `churned`.
+- **Role-aware routing**: a reply goes to whoever owns the contact and is handled with that role's reply task; mail
+  nobody owns goes to the default Chief of Staff for triage. New settings `defaultAmAgentId` / `defaultCosAgentId`.
+- **Routines** `account_review` (Account Manager) and `daily_digest` (Chief of Staff).
+- **Per-role KPIs** on the Dashboard (7/30 days) and `GET /v1/admin/kpis`, `hq kpis`. Rates with no data show "—",
+  never 0.
+- **Shadow runs**: start a bounded evaluation of shadow-tier agents on real mail (`hq shadow start|status|end|list`,
+  `/v1/admin/shadow`, Shadow run page and Dashboard card). Each agent gets a verdict (on track / not enough data /
+  below bar) against the promotion criteria, a rejection breakdown and a daily trend. The Chief of Staff digest flags a
+  piling-up review queue. Runbook in Vietnamese: [docs/SHADOW-RUN.md](docs/SHADOW-RUN.md).
+- **`hq email doctor`** (and `POST /v1/admin/email/doctor`): read-only preflight of the real mailbox — IMAP login,
+  Sent folder detection, how many messages a first sync would ingest, a dry run of how recent mail would be classified
+  and routed, SMTP auth without sending. `--send-test <address>` sends exactly one test email. Mailbox guide for Gmail,
+  Microsoft 365 and Zoho: [docs/EMAIL-SETUP.md](docs/EMAIL-SETUP.md).
+- **Opt-in Sent-folder sync** (`syncSent: true`, `sentFolder`): replies you send from your own mail client show up in
+  the agents' thread context, cancel pending follow-ups on that thread and mark older drafts as superseded.
+- **Eval suites** for the Account Manager (8 cases) and Chief of Staff (7 cases); the eval runner is role-generic
+  (roster agents, delegated-task assertions, `pattern` / `notPattern` / `contains` on result data).
+- `invented_availability` lint warning: flags an SDR draft that offers meeting times the agent cannot know.
+
+### Changed
+
+- **IMAP access is read-only**: mailboxes are opened with `EXAMINE` and fetched with `BODY.PEEK`, so agy-hq never marks
+  your mail as read, moves or deletes it. The first sync only ingests mail that arrives after the first connection
+  (`initialSyncDays`, default 0; `initialSyncMaxMessages`, default 200).
+- The sender refuses any email from an agent in the `shadow` tier, even if it was approved (defence in depth on top of
+  `held`).
+- Approval inbox: **Save & approve** in one step (key `A`) records your edit; rejecting needs only a category (keys
+  `1`–`8`), the written reason is optional (`hq outbox reject --category` alone works); the queue is worked
+  oldest-first and shows `revised ×N` / `superseded` badges.
+- A reply from a contact that is already a `customer` no longer moves it back to `replied`.
+
 ### Fixed
 
+- **IMAP provider**, now tested against real IMAP/SMTP protocol servers: a dropped connection could crash the daemon;
+  a failed connect was never retried; a wrong password was retried (risking an account lockout); the cursor could get
+  stuck behind a long run of deleted messages.
+- Settings page: saving before the stored values had loaded could overwrite them with defaults.
 - **SDR evals 8/8 on real agy**: `first-touch-good-fit` no longer proposes a fixed slot ("15-minute call, I'm free
   Tuesday"): the write-first-touch skill example, voice-and-tone rule, first_touch prompt and handle-reply skill now say
   the SDR has no calendar and must ask a low-friction question or share the KB meeting link. New `invented_availability`
@@ -76,5 +134,6 @@ Tested with `agy` 1.2.14 on Node 20.
 - Real IMAP/SMTP has been tested against few providers.
 - Throughput is bounded by your Antigravity account quota.
 
-[Unreleased]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tabenguyen/antigravity-one-person-company/releases/tag/v0.1.0
