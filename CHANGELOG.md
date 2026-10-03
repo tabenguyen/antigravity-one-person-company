@@ -10,6 +10,19 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ### Fixed
 
+- **SDR evals 8/8 on real agy**: `first-touch-good-fit` no longer proposes a fixed slot ("15-minute call, I'm free
+  Tuesday"): the write-first-touch skill example, voice-and-tone rule, first_touch prompt and handle-reply skill now say
+  the SDR has no calendar and must ask a low-friction question or share the KB meeting link. New `invented_availability`
+  lint warning (SDR, vi + en) flags offered times for the reviewer. `research-out-of-icp-answers-question` failed because
+  the eval seeded the inbound message only as task text; the lead's email is now also an inbound event (as in production),
+  so `Re: <their subject>` is not a deceptive subject; the research_lead prompt and the `deceptive_subject` refusal text
+  say when "Re:" is allowed.
+- **Lint false positive on echoed subjects**: a reply subject that repeats the customer's own subject ("Re: Uptime
+  guarantee for our board paper", "Trả lời: ...") no longer makes the Account Manager promise rules (and the SDR
+  placeholder / price / claim rules) refuse the draft. Lint reads only what the agent wrote: the echo is skipped, text
+  added to the subject and the body (quoted `>` lines aside) is still linted. The Account Manager template drops its
+  neutral-subject workaround. `am_sla_promise` also no longer fires on a pure acknowledgement / hand-off sentence ("I received your request
+  regarding the uptime guarantee; I've passed it to our team"): no figures, timeframes or affirmations about the service.
 - **Duplicate drafts**: `outbox_draft_email` keeps one live draft per email. A second draft for the same task and
   recipient rewrites the pending one in place (`revisions`, audit `outbox.revised`) or is refused once it was reviewed;
   a draft from another task on the same thread supersedes an older pending one only when the contact wrote since,

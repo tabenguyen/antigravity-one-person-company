@@ -5,6 +5,7 @@ import url from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTaskInput, runEvalCases, seedCase, teammateSpecs } from "../src/evals/runner.ts";
 import { EvalCaseZ } from "../src/evals/types.ts";
+import { hasPriorThread } from "../src/quality/lint-context.ts";
 import { makeTestConfig, openTestDb } from "./helpers.ts";
 import { addAgent, writeFixtureTemplates } from "./phase4-helpers.ts";
 
@@ -83,6 +84,21 @@ describe("eval runner — roster agents and chief-of-staff cases", () => {
     expect(db.crm.getContact(owned.contactId)).toMatchObject({ ownerAgentId: "eval-agent", stage: "customer" });
     const none = seedCase(db, "eval-agent", EvalCaseZ.parse({ ...TRIAGE_CASE, contact: { email: "other@x.example" } }), { ownerAgentId: null });
     expect(db.crm.getContact(none.contactId)!.ownerAgentId).toBeNull();
+  });
+
+  it("seedCase stores a thread.inbound message as an inbound event, so a Re: reply to it is not a deceptive subject", () => {
+    const db = openTestDb();
+    addAgent(db, "eval-agent", "sales-sdr");
+    const c = EvalCaseZ.parse({
+      ...TRIAGE_CASE,
+      contact: { email: "An.Le@x.example", name: "An" },
+      thread: { inbound: [{ subject: "Do you support Amazon?", body: "Does it work with Amazon?" }] },
+    });
+    seedCase(db, "eval-agent", c);
+    const events = db.inbound.listByThreadKey("contact:an.le@x.example", 5);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ fromAddress: "an.le@x.example", subject: "Do you support Amazon?", classification: "new_lead", status: "routed" });
+    expect(hasPriorThread(db, "an.le@x.example")).toBe(true);
   });
 
   it("the task input carries contactId when a contact is seeded (case input still wins)", () => {

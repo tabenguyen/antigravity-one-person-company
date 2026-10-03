@@ -12,7 +12,7 @@ import { computeShadowStatus } from "../../src/shadow.ts";
 import { setupTestApi, type TestApi } from "./test-helpers.ts";
 
 const NO_CTA = "Thanks for your time yesterday."; // lint: no_cta (warn)
-const WITH_CTA = "Thanks for your time yesterday. Would Thursday work for a quick chat?";
+const WITH_CTA = "Thanks for your time yesterday. Would a quick chat help?";
 
 interface Res {
   status: number;

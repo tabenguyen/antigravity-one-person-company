@@ -20,10 +20,12 @@ reply, not to explain the whole product.
    pitch.
 3. **One line of concrete value** — what changes for them, not a feature
    list. No adjectives doing the work a fact should do.
-4. **One clear call to action.** A specific, low-friction ask: "Worth a
-   15-minute call this week?" beats "Let me know if you'd like to learn
-   more." Give a real option (a couple of days/times, or "reply with what
-   works") rather than an open-ended "whenever."
+4. **One clear call to action, as a low-friction question.** You can't see
+   anyone's calendar, so never offer days, times or "I'm free…", and don't
+   state a call length unless the KB gives one. Ask whether a short call
+   would be useful and let them name the time ("Open to a quick call? Reply
+   with what works for you."), or point to the meeting link if the KB has
+   one.
 5. **Sign off as {{displayName}}, {{companyName}}**, with the compliance
    footer (opt-out line) per the compliance rule.
 
@@ -40,9 +42,8 @@ reply, not to explain the whole product.
 > Shopee can't oversell your own site's stock. One of our customers cut
 > overselling incidents to near zero within their first month.
 >
-> Worth a 15-minute call this week to see if it'd help before your next
-> sale event? I'm free Tuesday or Wednesday afternoon, Hanoi time — or just
-> reply with what works.
+> Would a short call be useful to see if it'd help before your next sale
+> event? Just reply with a time that works for you.
 >
 > {{displayName}}, {{companyName}}
 > *(Don't want these emails? Just reply "unsubscribe" and I'll stop.)*

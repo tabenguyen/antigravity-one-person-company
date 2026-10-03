@@ -11,6 +11,7 @@
 // keywords, so "I've passed your refund request to the team" stays clean.
 
 import type { LintFinding } from "@agyhq/core";
+import { splitEchoedSubject } from "./echoed-subject.ts";
 
 /** Lowercase, strip diacritics (incl. Vietnamese đ), unify apostrophes, collapse whitespace. */
 function fold(s: string): string {
@@ -86,7 +87,53 @@ const SLA_NOUN =
   /(?<![a-z])(?:sla|uptime|up-time|availability|service level|thoi gian hoat dong|do san sang|do on dinh|thoi gian phan hoi|thoi gian xu ly|response time|resolution time)(?![a-z])/;
 const SLA_BACKING =
   /\d+(?:[.,]\d+)?\s?%|(?<![a-z])(?:guarantee[sd]?|commit(?:s|ted|ment)?|promise[sd]?|ensure[sd]?|cam ket|dam bao|bao dam)(?![a-z])|within\s+\d|trong\s+(?:vong\s+)?\d+\s*(?:gio|phut|ngay)/;
-const SLA = (f: string) => (SLA_NOUN.test(f) && SLA_BACKING.test(f)) || /(?<![a-z\d])99(?:[.,]\d+)?\s?%/.test(f);
+const SLA_RAW = (f: string) => (SLA_NOUN.test(f) && SLA_BACKING.test(f)) || /(?<![a-z\d])99(?:[.,]\d+)?\s?%/.test(f);
+
+// Acknowledging what the customer asked ("I received your request regarding the uptime guarantee; I've passed it to
+// our team") restates their words and promises nothing. The exemption is FAIL-CLOSED: a sentence is exempt only when
+// EVERY clause that mentions SLA/uptime points at the customer's request, the sentence has an explicit receipt /
+// hand-off verb, and it contains no figure, no timeframe and no affirmation about the service ("will", "is", "have",
+// "included", "yes", "fine", "make sure", "get", sẽ / có / được / bao gồm / vâng ...). Anything else stays flagged.
+const ASKED =
+  /(?<![a-z])(?:your\s+(?:\w+\s+){0,2}?(?:request|question|query|ask|email|message|note|enquiry|inquiry|concern)s?|you(?:'ve|\s+have)?\s+(?:asked|requested|mentioned|raised|wrote|written|sent|noted)|(?:yeu cau|cau hoi|de nghi|email|tin nhan|thac mac)\s+(?:cua\s+)?(?:anh|chi|ban|quy khach)|(?:anh|chi|ban|quy khach)\s+(?:da\s+)?(?:hoi|yeu cau|de nghi|nhac|de cap|neu))(?![a-z])/;
+const HANDOFF =
+  /(?<![a-z])(?:received|passed|passing|forwarded|forwarding|escalated|escalating|checking|looped|looping|handed|noted|logged|flagged|raised|reviewing|looking into|asked (?:a |my |our )?(?:colleague|teammate|team)|da nhan|nhan duoc|da chuyen|chuyen (?:cho|toi|den|tiep|lai)|kiem tra|bao lai|ghi nhan)(?![a-z])/;
+// Any figure, "N nines", percent word or timeframe: a number next to SLA wording is never an acknowledgement.
+const FIGURE_OR_TIME =
+  /\d|%|(?<![a-z])(?:percent|per cent|phan tram|nines?|hundred|tram|hours?|minutes?|days?|weeks?|months?|today|tomorrow|tonight|asap|soon|shortly|gio|phut|ngay|tuan|thang|hom nay|ngay mai)(?![a-z])/;
+const OWN_CLAIM =
+  /(?<![a-z])(?:we|i|chung toi|em|ben em|cong ty)(?:'ll|'d|\s+will|\s+can|\s+do|\s+shall)?\s+(?:\w+\s+){0,3}?(?:guarantee|commit|promise|ensure|confirm|offer|provide|deliver|maintain|cam ket|dam bao|bao dam|xac nhan)|(?<![a-z])(?:sla|uptime|availability)\s+(?:is|are|will be|stands|has been|se)(?![a-z])/;
+// Receipt / hand-off phrasings that legitimately contain an auxiliary ("I've passed", "I'll check", "who will reply").
+const SAFE_PHRASES = new RegExp(
+  [
+    String.raw`(?<![a-z])(?:i|we)(?:'ve|'d|\s+have|\s+had)?\s+(?:just\s+|already\s+)?(?:received|passed|forwarded|escalated|logged|noted|flagged|raised|handed|looped|asked)(?![a-z])`,
+    String.raw`(?<![a-z])(?:i|we)(?:'ll|\s+will)\s+(?:pass|forward|check|escalate|flag|raise|ask|loop|look into|follow up|get back|let you know|review)(?![a-z])`,
+    String.raw`(?<![a-z])(?:i|we)(?:'m|'re|\s+am|\s+are)\s+(?:checking|passing|forwarding|looping|escalating|reviewing|looking into)(?![a-z])`,
+    String.raw`(?<![a-z])will\s+(?:reply|respond|get back|follow up|come back|be in touch|write back|review|look into|check|take a look)(?![a-z])`,
+    // noun uses of the commitment words: "the uptime guarantee", "uptime guarantee", "your SLA commitment"
+    String.raw`(?<![a-z])(?:(?:the|a|an|your|this|that|any|its|their|our)\s+)?(?:(?:uptime|up-time|sla|availability|service level)\s+)?(?:guarantee|commitment|promise)s?(?![a-z])(?=\s+(?:and|or|for|about|on|regarding|terms|question|request|you|that|which|to|in)\b|\s*$|[,;:.])`,
+    String.raw`(?<![a-z])(?:da\s+)?nhan duoc(?![a-z])`,
+    String.raw`(?<![a-z])(?:ve|lien quan den|lien quan toi|cua|nhu|ve viec)\s+(?:cam ket|dam bao|bao dam)(?![a-z])`,
+  ].join("|"),
+  "g",
+);
+// Affirmations / assertions about the service that must never sit in an "acknowledgement".
+const ASSERTION =
+  /(?<![a-z])(?:will|shall|can|could|would|may|might|must|should|is|are|was|were|be|been|being|have|has|had|do|does|did|get|gets|got|give|gives|include[ds]?|including|cover(?:s|ed)?|appl(?:y|ies|ied)|provide[sd]?|offer(?:s|ed)?|guarantee[sd]?|guaranteeing|commit(?:s|ted|ting)?|promise[sd]?|ensure[sd]?|assure[sd]?|confirm(?:s|ed)?|maintain(?:s|ed)?|deliver(?:s|ed)?|support(?:s|ed)?|meet(?:s)?|stand(?:s)?|hold(?:s)?|keep(?:s)?|yes|yeah|yep|sure|fine|ok|okay|definitely|absolutely|certainly|of course|no problem|make sure|se|co|duoc|bao gom|dam bao|bao dam|cam ket|xac nhan|vang|la|ok|chac chan|cung cap|ap dung|done|agreed?|approved?|accepted|granted|settled|handled|sorted|taken care|no worries|consider|dong y|chap nhan|duyet|xong|giai quyet|dong thuan)(?![a-z])|'ll|'re|'s|'m/;
+
+/** True when `f` (a folded sentence mentioning SLA / uptime) is nothing but an acknowledgement / hand-off of the customer's ask. */
+function isPureAcknowledgement(f: string): boolean {
+  if (!ASKED.test(f) || !HANDOFF.test(f) || FIGURE_OR_TIME.test(f) || OWN_CLAIM.test(f)) return false;
+  // Every clause that talks about SLA / uptime must itself point at the customer's request.
+  // Every clause must itself be part of the acknowledgement (point at the ask or hand it off), so a trailing
+  // "…; consider it done" / "…, bên em đồng ý ạ" can't ride along on an exempt sentence.
+  for (const clause of f.split(/[,;:—–]|\s-\s/)) {
+    if ((SLA_NOUN.test(clause) || SLA_BACKING.test(clause)) && !ASKED.test(clause)) return false;
+    if (/[a-z]/.test(clause) && !ASKED.test(clause) && !HANDOFF.test(clause)) return false;
+  }
+  return !ASSERTION.test(f.replace(SAFE_PHRASES, " "));
+}
+const SLA = (f: string) => SLA_RAW(f) && !isPureAcknowledgement(f);
 
 const DELIVERY_CONTEXT =
   /(?<![a-z])(?:bug|fix(?:ed|es)?|patch|hotfix|feature|release|ship(?:ped|ping)?|roll(?:ed)?\s?out|rollout|implement(?:ed|ation)?|defect|tinh nang|sua loi|khac phuc|phat hanh|trien khai|ra mat|ban va|loi (?:nay|do|he thong|phan mem))(?![a-z])/;
@@ -187,4 +234,26 @@ export function lintAccountManagerPromises(text: string): LintFinding[] {
     }
   }
   return findings;
+}
+
+/**
+ * Lint an Account Manager draft. Only what the agent wrote counts: a subject that repeats the customer's own
+ * ("Re: Uptime guarantee for our board paper") is skipped, and quoted ">" lines in the body are skipped (see
+ * `sentencesOf`). Text the agent adds to the subject beyond the echo is still linted — on its own, and combined
+ * with the echo for any category the echo does not already trigger by itself ("Re: Refund request" + "approved").
+ */
+export function lintAccountManagerDraft(
+  draft: { subject: string | null | undefined; body: string },
+  threadSubjects?: readonly string[],
+): LintFinding[] {
+  const subject = (draft.subject ?? "").trim();
+  const body = draft.body ?? "";
+  const split = splitEchoedSubject(subject, threadSubjects);
+  if (!split.echoed) return lintAccountManagerPromises(`${subject}\n${body}`);
+  const onlyAgent = lintAccountManagerPromises(`${split.added}\n${body}`);
+  if (!split.added) return onlyAgent;
+  const echoCodes = new Set(lintAccountManagerPromises(split.echo).map((f) => f.code));
+  const have = new Set(onlyAgent.map((f) => f.code));
+  const combined = lintAccountManagerPromises(`${subject}\n${body}`).filter((f) => !echoCodes.has(f.code) && !have.has(f.code));
+  return [...onlyAgent, ...combined];
 }

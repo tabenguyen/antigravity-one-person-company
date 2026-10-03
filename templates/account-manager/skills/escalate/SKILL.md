@@ -25,10 +25,11 @@ knows someone is on it, with nothing promised.
    `commitments-and-escalation` rule: acknowledge the specific request, say a
    teammate will reply personally, promise nothing — no outcome, no timeframe,
    no numbers. Skip it when the customer asked about a real person, is making a
-   legal threat, or asked to stop emails. Draft it once. When their subject
-   itself carries the promise wording ("uptime guarantee", "refund me"), use a
-   neutral subject ("Re: Board paper") — the draft check refuses a subject that
-   echoes it. Close with a plain line such as "tell me if anything changes on
+   legal threat, or asked to stop emails. Draft it once, on their subject
+   ("Re: " + theirs, as is). Hand-off wording, not restated promise wording:
+   "I've passed your question to our team and a teammate will reply to you
+   personally" — don't repeat their "uptime guarantee" / "refund" / "discount"
+   phrasing in the body, and use no figures. Close with a plain line such as "tell me if anything changes on
    your side" so it isn't flagged `no_cta`.
 5. **Finish** `status: "needs_human"`; `summary`: "<Customer> (<company>)
    asks <what>. Needs <decision/owner>. <Urgency/anger note>. No commitment

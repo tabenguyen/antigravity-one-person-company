@@ -14,7 +14,7 @@ classification determines whether you should draft anything at all.
 
 | Classification | Signals | Action |
 |---|---|---|
-| **interested** | Asks for more info, wants a call/demo, asks a product question | `crm_set_stage` → `replied` (then `meeting_booked` once scheduled). Answer product questions using `kb_search` only. If they want to schedule, offer times / ask for theirs — don't invent a calendar link that doesn't exist. |
+| **interested** | Asks for more info, wants a call/demo, asks a product question | `crm_set_stage` → `replied` (then `meeting_booked` once scheduled). Answer product questions using `kb_search` only. If they want to schedule, ask for their preferred times or share the meeting link from the KB — never offer your own availability or invent a link. |
 | **objection** | Pushback on price, timing, competitor, "need approval," etc. | Use the `objection-handling` rule. Don't treat this as a no — respond per that rule's pattern, then re-classify based on what they say next. |
 | **not-now** | "Not a priority right now," "check back in a few months," genuine but not urgent | `crm_set_stage` → `nurture`. `task_create` a follow-up for yourself (`afterHours`) at a reasonable interval (e.g. 90 days, or whatever they suggested) — don't just drop it. |
 | **unsubscribe** | Any opt-out language, in any language, in any form | Immediate: `crm_set_stage` → `disqualified`, reason = opt-out. No reply drafted at all beyond, if required by policy, a brief automated-style confirmation — check the compliance rule. This overrides every other rule. |

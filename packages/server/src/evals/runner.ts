@@ -326,7 +326,25 @@ export function seedCase(db: Db, agentId: string, c: EvalCase, opts: { ownerAgen
       .run(at, at, `seed-${i}-${draft.id}@eval.example`, draft.id);
     db.crm.addNote("contact", contact.id, `Sent email "${s.subject}".`, agentId);
   }
-  for (const m of inbound) db.crm.addNote("contact", contact.id, `Reply received: ${m.body.slice(0, 500)}`, agentId);
+  const lastSentSubject = sent.length > 0 ? sent[sent.length - 1]!.subject : null;
+  for (const [i, m] of inbound.entries()) {
+    db.crm.addNote("contact", contact.id, `Reply received: ${m.body.slice(0, 500)}`, agentId);
+    // In production every message from a contact is an inbound_events row (and that is what makes a "Re:" subject
+    // legitimate), so the seed stores one too. Marked routed so the daemon does not route it into another task.
+    db.inbound.insertIfNew({
+      source: "email",
+      externalId: `eval-seed-${i}-${contact.id}`,
+      fromAddress: email,
+      fromName: ct.name ?? null,
+      subject: m.subject ?? (lastSentSubject ? `Re: ${lastSentSubject}` : null),
+      bodyText: m.body,
+      threadKey,
+      contactId: contact.id,
+      classification: sent.length > 0 ? "reply" : "new_lead",
+      status: "routed",
+      statusReason: "eval seed",
+    });
+  }
   return { email, contactId: contact.id };
 }
 

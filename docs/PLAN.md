@@ -233,10 +233,21 @@ from the model's head.
 - Postgres, multi-tenant (several companies), packaging roles as agy plugins.
 
 **Known issues (fix later)** — found by the Phase 4 real-agy eval runs, 2026-10-03
-- [ ] SDR evals 6/8 (pre-existing, also fail before Phase 4):
-  `research-out-of-icp-answers-question` drafts "Re: …" with no prior thread →
-  refused by `deceptive_subject` lint; `first-touch-good-fit` about half the
-  runs proposes a fixed "15-minute call, I'm free Tuesday" CTA.
+- [x] ~~SDR evals 6/8~~ — **fixed 2026-10-03**: SDR suite 8/8 on
+  gemini-3.8-flash-medium in two consecutive full runs, plus 3/3 each for
+  `first-touch-good-fit` and `research-out-of-icp-answers-question`.
+  `research-out-of-icp-answers-question`: the lint was right and so was the
+  agent; the eval harness only put the lead's email in the task text, not in
+  `inbound_events` (production always has the event, which `hasPriorThread`
+  already counts), so "Re: Do you support Amazon?" looked deceptive. `seedCase`
+  now stores `thread.inbound` as inbound events; the research_lead prompt says
+  "Re:" only echoes a subject they sent, and the refusal tells the agent to use
+  a plain subject. `first-touch-good-fit`: the write-first-touch example itself
+  taught "I'm free Tuesday or Wednesday" and "15-minute call"; the skill, the
+  voice-and-tone rule, the first_touch prompt and handle-reply now say the SDR
+  has no calendar (ask a low-friction question or share the KB meeting link).
+  New `invented_availability` lint warning (SDR, vi + en). See
+  docs/TECHNICAL.md "Lint: SDR availability warning".
 - [x] ~~Duplicate drafts~~ — **fixed 2026-10-03**, server-side
   (`agent-api/outbox-draft.ts`): a second draft in the same task for the same
   recipient rewrites the pending one in place (`outbox.revised`, `revisions`),
@@ -247,16 +258,21 @@ from the model's head.
   now says "saved and queued; warnings are for the reviewer; don't draft
   again", and the SDR template carries the same rule as the AM one. See
   docs/TECHNICAL.md "One draft per email".
-- [ ] AM lint false positive: `quality/am-lint.ts` scans the subject, so
-  "Re: <customer subject containing refund / uptime guarantee>" is refused.
-  Lint only text the agent wrote, not the echoed subject. (The AM template
-  works around it with neutral subjects; `message-sla-uptime-bait` is still
-  occasionally flaky.)
+- [x] ~~AM lint false positive~~ — **fixed 2026-10-03**: lint reads only what the
+  agent wrote. A subject that is reply prefixes (Re:/Fwd:/TL:/Trả lời: chains)
+  + a subject from the contact's inbound mail on the thread is an echo and is
+  skipped by the AM promise rules (and the SDR content rules, same helper);
+  text added to the subject is still linted. The AM template no longer asks for
+  neutral subjects. See docs/TECHNICAL.md "Lint: only the agent's own words".
 - [ ] Small API gaps the UI works around: `GET /v1/admin/audit` has no
   `contactId` filter; `GET /v1/admin/contacts` has no stage filter (UI filters
   the latest 200 client-side).
 - [ ] Eval runs against real agy have no npm script / CLI entry for non-SDR
   suites; `draft.lintErrors` only supports `equals` (no `max`).
+
+- [ ] AM promise lint is per sentence: a promise split into its own sentence
+  without SLA/refund wording ("I've passed it on. Consider it done.") is not
+  caught. The human reviewer is the backstop; consider a cross-sentence pass.
 
 ---
 

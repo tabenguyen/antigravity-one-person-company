@@ -35,6 +35,19 @@ export function hasPriorThread(db: Db, to: string, threadKey?: string | null, ex
   return outbound !== undefined;
 }
 
+/** Subjects of the contact's recent inbound mail (from their address, or on this thread), newest first. */
+export function threadInboundSubjects(db: Db, to: string, threadKey?: string | null, limit = 8): string[] {
+  const rows = db.sqlite
+    .prepare(
+      `SELECT subject FROM inbound_events
+       WHERE subject IS NOT NULL AND trim(subject) != ''
+         AND (lower(from_address) = @addr OR (@threadKey IS NOT NULL AND thread_key = @threadKey))
+       ORDER BY received_at DESC LIMIT @limit`,
+    )
+    .all({ addr: to.trim().toLowerCase(), threadKey: threadKey ?? null, limit }) as { subject: string }[];
+  return [...new Set(rows.map((r) => r.subject))];
+}
+
 /**
  * Lines that tell the agent what NOT to say ("Không báo giá 50.000đ/tháng", "never quote $99") mention
  * prices precisely so they are avoided — they must not count as grounding for those prices.
@@ -79,6 +92,7 @@ export function buildLintContext(db: Db, args: BuildLintContextArgs): LintContex
     role: args.agent.role,
     hasPriorThread: prior,
     firstTouch: !prior,
+    threadSubjects: prior ? threadInboundSubjects(db, args.to, args.threadKey) : [],
   };
 }
 

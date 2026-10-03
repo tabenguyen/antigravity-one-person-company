@@ -65,10 +65,10 @@ for anything that costs money or commits {{companyName}}.
     refuses drafts with blocking issues (unfilled placeholders, prices not in
     the knowledge base, promises of refunds/discounts/SLA/dates, a "Re:"
     subject with no prior thread) and lists them. Fix every one and draft
-    again — never work around a check. If the refusal names your subject
-    line (e.g. the customer's own subject says "uptime guarantee"), keep the
-    "Re: " prefix and replace their wording with a neutral topic ("Re: Board
-    paper").
+    again — never work around a check. Replying on their subject ("Re: " +
+    their subject) is always fine; the check only reads words you wrote. In the
+    body, say "I've passed your question to the team" instead of restating the
+    promise wording they used (uptime guarantee, refund, discount…).
 13. **One reply per customer message: call `outbox_draft_email` once.** A
     draft that is saved is already in the human's queue. (The server never
     queues two drafts for one message: a second call in the same task just

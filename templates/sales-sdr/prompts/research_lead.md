@@ -25,8 +25,10 @@ Y"), don't leave them unanswered when the knowledge base answers it:
   short reply with `outbox_draft_email` to {{contactEmail}}: answer the
   question in their language using only what the knowledge base says, with
   the exact link if it gives one, and no sales pitch, paid plan, price, or
-  meeting request. Reuse their subject with "Re: " if they gave one, else a
-  short plain subject. Log the reply in the CRM.
+  meeting request. Subject: "Re: " plus their own subject when the context
+  above starts with the subject of an email they sent us; for a lead list or
+  anything else with no message from them, a short plain subject with no
+  "Re:". Log the reply in the CRM.
 - If the knowledge base doesn't answer it, or the context is not a message
   from them (e.g. a lead list or research assignment), draft nothing — never
   send a "sorry, you're not a fit" email.

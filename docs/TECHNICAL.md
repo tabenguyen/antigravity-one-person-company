@@ -253,6 +253,41 @@ Contract and definitions: [`docs/PHASE4.md`](PHASE4.md). Summary of what the dae
 - **CLI**: `hq kpis [--days n]`, `hq briefings [list|show <id>]`,
   `hq contact handoff <id> [--summary ...]`, `hq routine create --kind account_review|daily_digest`.
 
+## Lint: only the agent's own words
+
+`outbox_draft_email` lints every draft (`quality/lint.ts`, AM promise rules in `quality/am-lint.ts`); `error` findings
+refuse the draft. The rules must judge what the agent wrote, not text echoed from the customer:
+
+- **Echoed subject** (`quality/echoed-subject.ts`): the lint context carries `threadSubjects` = subjects of the contact's
+  recent inbound mail (from their address or on the thread key; `threadInboundSubjects` in `lint-context.ts`). A draft
+  subject that is reply prefixes (`Re:`, `RE[2]:`, `Fwd:`, `FW:`, `TL:`, `Trả lời:`, `Chuyển tiếp:`, `AW:`, `SV:`, `RV:`,
+  chains allowed) followed by one of those subjects (case, whitespace and prefix chains ignored) is an echo. The echo
+  is excluded from the placeholder / unknown_price / forbidden_claim / ai_self_reference / guarantee_language /
+  subject_spammy rules and from all `am_*` promise rules. Text the agent adds after the echo is still linted (for `am_*`
+  also combined with the echo, for any category the echo does not trigger alone). A subject that only borrows some of
+  the customer's words, or has agent text before the echo, is not an echo. `deceptive_subject`, `subject_too_long` and
+  the body rules are unchanged.
+- **Quoted lines**: body lines starting with `>` are skipped by the AM promise rules.
+- **Acknowledging the ask** (`am_sla_promise` only, fail-closed): a sentence is exempt only when every clause that
+  mentions SLA/uptime points at the customer's request ("your request / question / email ...", "you asked ...", vi "yêu
+  cầu của anh"), the sentence has a receipt / hand-off verb (received, passed, forwarded, checking, escalated; vi đã nhận,
+  chuyển, kiểm tra), and it has no figure, timeframe or affirmation (will / is / have / included / yes / fine / make sure /
+  get, vi sẽ / có / được / bao gồm / vâng ...), nor "we guarantee / commit / confirm ...". Everything else stays flagged.
+- Nothing is exempt in the body: a genuine promise in the body is flagged whatever the subject says.
+
+## Lint: SDR availability warning and "Re:" subjects
+
+- **`invented_availability`** (warning, role `sales-sdr` only; `quality/availability-lint.ts`): the SDR has no calendar
+  tool, so first-person availability ("I'm free Tuesday", "we are available tomorrow", "thứ Ba mình rảnh", "em rảnh
+  chiều mai") or a proposed slot ("Does Thursday at 10:30 work?", "How about Monday?", "Are you free Friday
+  afternoon?") is flagged for the reviewer. A weekday, tomorrow/tonight, this morning/afternoon/evening or a clock time
+  must be involved: "worth a quick call this week?" and "reply with a time that suits you" are fine. It never blocks.
+- **`deceptive_subject`** (error) still fires on `Re:`/`Fwd:` with no prior thread, but "prior thread" includes every
+  `inbound_events` row from the contact: a lead who wrote in (inbound email or form) is a thread, and `Re: <their
+  subject>` is a legitimate reply. The refusal message now says to use a plain subject. The eval harness seeds
+  `thread.inbound` messages as inbound events (`seedCase`) so that eval cases behave like production, where the inbound
+  event always exists before the task that answers it.
+
 ## One draft per email (`outbox_draft_email`)
 
 Agents used to redraft after a lint *warning* (the first draft was already stored), so two drafts for one email

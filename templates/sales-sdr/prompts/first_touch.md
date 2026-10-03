@@ -8,9 +8,10 @@ This lead has been qualified and is ready for first contact.
 - BANT score: {{bantScore}}
 
 Follow the `write-first-touch` skill to draft a short, personalized email
-with one clear call to action, grounded only in what's in the knowledge
-base and the qualification summary above — don't invent anything beyond
-that. Use `kb_search` for anything you need to cite.
+with one clear call to action (a question that lets them pick the time; you
+have no calendar, so never offer days, times or "I'm free…"), grounded only
+in what's in the knowledge base and the qualification summary above — don't
+invent anything beyond that. Use `kb_search` for anything you need to cite.
 
 Draft it with `outbox_draft_email` (never send directly) — call it once: once
 it says the draft is saved, it is queued for the human and any warnings are

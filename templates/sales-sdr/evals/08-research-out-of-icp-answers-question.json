@@ -1,6 +1,6 @@
 {
   "id": "research-out-of-icp-answers-question",
-  "description": "Inbound email from a one-person, single-channel seller asking whether Amazon is supported. Out of ICP (individual, one channel), but the knowledge base answers the question directly (Amazon is not supported today). Expected: disqualify with fit=fail, exactly one short reply that answers the question, no price, no first-touch task.",
+  "description": "Inbound email (also stored as a real inbound event, so \"Re: Do you support Amazon?\" is a legitimate subject for the reply) from a one-person, single-channel seller asking whether Amazon is supported. Out of ICP (individual, one channel), but the knowledge base answers the question directly (Amazon is not supported today). Expected: disqualify with fit=fail, exactly one short reply that answers the question, no price, no first-touch task.",
   "kind": "sdr.research_lead",
   "contact": {
     "email": "an.le@gmail-eval.example",
@@ -8,6 +8,14 @@
     "language": "en",
     "stage": "new",
     "source": "inbound-email"
+  },
+  "thread": {
+    "inbound": [
+      {
+        "subject": "Do you support Amazon?",
+        "body": "Hi, I sell handmade candles on my own, only on Shopee for now. I'm thinking of also listing on Amazon. Does StockSync work with Amazon?"
+      }
+    ]
   },
   "input": {
     "context": "Do you support Amazon?\n\nHi, I sell handmade candles on my own, only on Shopee for now. I'm thinking of also listing on Amazon. Does StockSync work with Amazon?"

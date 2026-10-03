@@ -7,7 +7,9 @@
 // and draft again); `warn`/`info` are shown to the human reviewer only.
 
 import type { LintFinding } from "@agyhq/core";
-import { lintAccountManagerPromises } from "./am-lint.ts";
+import { lintAccountManagerDraft } from "./am-lint.ts";
+import { findInventedAvailability } from "./availability-lint.ts";
+import { agentWrittenSubject } from "./echoed-subject.ts";
 
 export interface LintDraft {
   subject: string | null | undefined;
@@ -38,6 +40,8 @@ export interface LintContext {
   hasPriorThread?: boolean;
   /** Defaults to `!hasPriorThread`. */
   firstTouch?: boolean;
+  /** Subjects of the contact's inbound mail on this thread; a reply subject that echoes one is not linted as the agent's own words. */
+  threadSubjects?: string[];
 }
 
 export const LINT_LIMITS = {
@@ -311,7 +315,9 @@ const SEVERITY_ORDER: Record<LintFinding["severity"], number> = { error: 0, warn
 export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[] {
   const subject = (draft.subject ?? "").trim();
   const body = draft.body ?? "";
-  const all = `${subject}\n${body}`;
+  // Content rules read only what the agent wrote: an echoed customer subject ("Re: <their subject>") is skipped.
+  const agentSubject = agentWrittenSubject(subject, ctx.threadSubjects);
+  const all = `${agentSubject}\n${body}`;
   const findings: LintFinding[] = [];
   const add = (code: string, severity: LintFinding["severity"], message: string) => findings.push({ code, severity, message });
 
@@ -363,7 +369,19 @@ export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[
 
   // deceptive_subject -----------------------------------------------------
   if (/^\s*(?:re|fwd?|fw)\s*:/i.test(subject) && !ctx.hasPriorThread) {
-    add("deceptive_subject", "error", 'Subject starts with "Re:"/"Fwd:" but there is no prior thread with this contact — that is a deceptive subject line.');
+    add("deceptive_subject", "error", 'Subject starts with "Re:"/"Fwd:" but there is no message from or to this contact on record, so it is a deceptive subject line. Use a plain subject without "Re:"/"Fwd:" (reuse "Re:" only for a message they actually sent).');
+  }
+
+  // invented_availability (SDR has no calendar) ----------------------------
+  if (ctx.role === "sales-sdr") {
+    const slots = findInventedAvailability(body);
+    if (slots.length > 0) {
+      add(
+        "invented_availability",
+        "warn",
+        `Offers a specific time or availability (${quoteList(slots, 3)}) but there is no calendar access. Ask when suits them or share the meeting link instead of proposing slots.`,
+      );
+    }
   }
 
   // guarantee_language ----------------------------------------------------
@@ -392,13 +410,13 @@ export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[
   const spam: string[] = [];
   // One shouted word of 4+ letters ("URGENT"), or 3-letter caps words back to back ("BUY NOW"). 3-letter acronyms
   // separated by ordinary words ("CRM", "tải XML từ PDF") are fine.
-  const capsWords = [...subject.matchAll(/(?<![\p{L}\p{N}])\p{Lu}{3,}(?![\p{L}\p{N}])/gu)].map((m) => m[0]);
+  const capsWords = [...agentSubject.matchAll(/(?<![\p{L}\p{N}])\p{Lu}{3,}(?![\p{L}\p{N}])/gu)].map((m) => m[0]);
   const shouting =
     capsWords.some((w) => w.length >= 4) ||
-    /(?<![\p{L}\p{N}])\p{Lu}{3,}[\s\p{P}]+\p{Lu}{3,}(?![\p{L}\p{N}])/u.test(subject);
+    /(?<![\p{L}\p{N}])\p{Lu}{3,}[\s\p{P}]+\p{Lu}{3,}(?![\p{L}\p{N}])/u.test(agentSubject);
   if (shouting) spam.push(`ALL CAPS (${quoteList(capsWords, 3)})`);
   for (const [re, label] of SPAM_SUBJECT_PATTERNS) {
-    if (re.test(subject) && !(label === '"FREE"' && shouting && capsWords.includes("FREE"))) spam.push(label);
+    if (re.test(agentSubject) && !(label === '"FREE"' && shouting && capsWords.includes("FREE"))) spam.push(label);
   }
   if (spam.length > 0) add("subject_spammy", "warn", `Subject looks spammy: ${spam.join(", ")}.`);
 
@@ -442,7 +460,7 @@ export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[
   }
 
   // account-manager promises (refunds, discounts, credits, SLA, delivery dates, contract changes) -------
-  if (ctx.role === "account-manager") findings.push(...lintAccountManagerPromises(all));
+  if (ctx.role === "account-manager") findings.push(...lintAccountManagerDraft({ subject, body }, ctx.threadSubjects));
 
   return findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }
