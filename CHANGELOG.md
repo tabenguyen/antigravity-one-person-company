@@ -8,6 +8,10 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ## [Unreleased]
 
+### Changed
+
+- docs: README demo screenshots for the v0.2.0 features (SDR → Account Manager hand-off, KPIs by role, Chief of Staff briefing, shadow run); `npm run demo:screenshots` now produces 7 images.
+
 ## [0.2.0] - 2026-10-03
 
 Two new AI employees, hand-offs between them, and everything needed to start a

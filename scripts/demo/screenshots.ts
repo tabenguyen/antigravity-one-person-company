@@ -4,7 +4,7 @@
 // Your real dataDir and daemon are never touched.
 //
 //   npm run demo:screenshots                    all shots
-//   npm run demo:screenshots -- --only sent     one shot (inbound | sent | contact)
+//   npm run demo:screenshots -- --only sent     one shot (inbound | sent | contact | handoff | kpis | briefing | shadow)
 //   npm run demo:screenshots -- --keep          leave the demo daemon running to look around
 //
 // Env: DEMO_PORT (default 7318), DEMO_CHROMIUM_PATH (use an existing Chromium instead of
@@ -24,11 +24,20 @@ const FIXTURES = path.join(REPO, "scripts/demo/fixtures");
 const PORT = Number(process.env.DEMO_PORT ?? 7318);
 const BASE = `http://127.0.0.1:${PORT}`;
 const HERO_EMAIL = "thuha@spahoasen.example";
+const HANDOFF_EMAIL = "chau@pilatessenvang.example";
 
 const { values: args } = parseArgs({ options: { only: { type: "string" }, keep: { type: "boolean" } } });
 
-/** Each shot: output file, how to get the page into the right state, and an optional crop height (CSS px). */
-const SHOTS: Record<string, { file: string; clipHeight?: number; go: (page: Page, ctx: { contactId: string }) => Promise<void> }> = {
+interface ShotCtx {
+  contactId: string;
+  handoffContactId: string;
+}
+
+/**
+ * Each shot: output file, how to get the page into the right state, and how to crop it:
+ * `clipHeight` (CSS px from the top of the viewport) or `clipTo` (a selector; the page is scrolled to it first).
+ */
+const SHOTS: Record<string, { file: string; viewportHeight?: number; clipHeight?: number; clipTo?: string; go: (page: Page, ctx: ShotCtx) => Promise<void> }> = {
   inbound: {
     file: "demo-1-inbound.png",
     clipHeight: 760,
@@ -40,6 +49,7 @@ const SHOTS: Record<string, { file: string; clipHeight?: number; go: (page: Page
   },
   sent: {
     file: "demo-2-auto-reply-sent.png",
+    viewportHeight: 1230, // room for the shadow-run and "tasks waiting" banners above the list
     go: async (page) => {
       await page.goto(`${BASE}/inbox`);
       await page.getByRole("tab", { name: "Sent" }).click();
@@ -53,6 +63,44 @@ const SHOTS: Record<string, { file: string; clipHeight?: number; go: (page: Page
     go: async (page, { contactId }) => {
       await page.goto(`${BASE}/contacts/${contactId}`);
       await page.getByText("Timeline").waitFor();
+    },
+  },
+  // v0.2.0: SDR -> Account Manager hand-off, per-role KPIs, Chief of Staff briefing, shadow run.
+  handoff: {
+    file: "demo-4-handoff-account-manager.png",
+    clipHeight: 872,
+    go: async (page, { handoffContactId }) => {
+      await page.goto(`${BASE}/contacts/${handoffContactId}`);
+      await page.getByText("Handoff history").waitFor();
+      await page.getByText("Onboard Lý Minh Châu").waitFor();
+    },
+  },
+  kpis: {
+    file: "demo-5-kpis-by-role.png",
+    viewportHeight: 2200, // tall enough that the whole section is on screen (the app scrolls inside its own layout)
+    clipTo: ".kpi-section",
+    go: async (page) => {
+      await page.goto(`${BASE}/dashboard`);
+      await page.getByText("KPIs by role").waitFor();
+      await page.getByText("Handoffs to AM").waitFor();
+    },
+  },
+  briefing: {
+    file: "demo-6-chief-of-staff-briefing.png",
+    clipHeight: 690,
+    go: async (page) => {
+      await page.goto(`${BASE}/briefings`);
+      await page.getByText("Cần anh/chị xử lý hôm nay").first().waitFor();
+    },
+  },
+  shadow: {
+    file: "demo-7-shadow-run.png",
+    viewportHeight: 1800, // the app scrolls inside its own layout, so a long page needs a tall viewport
+    clipHeight: 1776,
+    go: async (page) => {
+      await page.goto(`${BASE}/shadow`);
+      await page.getByRole("heading", { name: "Daily trend — all agents" }).waitFor();
+      await page.getByText("Progress against the promotion bar").first().waitFor();
     },
   },
 };
@@ -138,6 +186,8 @@ async function main(): Promise<void> {
     const readFixture = (name: string) => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf8"));
     await api(token, "PUT", "/v1/admin/setup/company", readFixture("company-profile.json"));
     await api(token, "PUT", "/v1/admin/setup/role-kb", readFixture("role-kb.json"));
+    await api(token, "PUT", "/v1/admin/setup/role-kb", readFixture("role-kb-am.json"));
+    await api(token, "PUT", "/v1/admin/setup/role-kb", readFixture("role-kb-cos.json"));
     await api(token, "POST", "/v1/admin/killswitch", { outboundEnabled: true });
     const { contacts } = await api<{ contacts: { id: string }[] }>(
       token,
@@ -145,6 +195,8 @@ async function main(): Promise<void> {
       `/v1/admin/contacts?email=${encodeURIComponent(HERO_EMAIL)}`,
     );
     const contactId = contacts[0]!.id;
+    const handoff = await api<{ contacts: { id: string }[] }>(token, "GET", `/v1/admin/contacts?email=${encodeURIComponent(HANDOFF_EMAIL)}`);
+    const handoffContactId = handoff.contacts[0]!.id;
 
     const browser = await chromium.launch(process.env.DEMO_CHROMIUM_PATH ? { executablePath: process.env.DEMO_CHROMIUM_PATH } : {});
     try {
@@ -160,10 +212,23 @@ async function main(): Promise<void> {
       fs.mkdirSync(OUT, { recursive: true });
       for (const name of names) {
         const shot = SHOTS[name]!;
-        await shot.go(page, { contactId });
+        await page.setViewportSize({ width: 1440, height: shot.viewportHeight ?? 1000 });
+        await shot.go(page, { contactId, handoffContactId });
         await page.waitForTimeout(500); // let SSE-driven refreshes settle
         const file = path.join(OUT, shot.file);
-        await page.screenshot({ path: file, clip: shot.clipHeight ? { x: 0, y: 0, width: 1440, height: shot.clipHeight } : undefined });
+        if (shot.clipTo) {
+          // Crop to one section (plus a little air), in document coordinates.
+          const box = (await page.locator(shot.clipTo).first().boundingBox())!;
+          const pad = 14;
+          const scrollY = await page.evaluate(() => window.scrollY);
+          await page.screenshot({
+            path: file,
+            fullPage: true,
+            clip: { x: Math.max(0, box.x - pad), y: Math.max(0, box.y + scrollY - pad), width: box.width + 2 * pad, height: box.height + 2 * pad },
+          });
+        } else {
+          await page.screenshot({ path: file, fullPage: true, clip: shot.clipHeight ? { x: 0, y: 0, width: 1440, height: shot.clipHeight } : undefined });
+        }
         console.log(`saved ${path.relative(REPO, file)}`);
       }
     } finally {

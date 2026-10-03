@@ -1,0 +1,17 @@
+{
+  "role": "account-manager",
+  "files": [
+    {
+      "relPath": "onboarding-playbook.md",
+      "body": "# Onboarding khách mới\n\nKhách vừa chốt gói muốn có lịch đặt online và nhắc lịch Zalo chạy trong tuần đầu.\n\n## 3 bước đầu tiên\n\n1. Thêm nhân viên và giờ làm: booknhanh.example/bat-dau\n2. Nhập lịch và danh sách khách từ Excel (Cài đặt > Nhập dữ liệu, có file mẫu).\n3. Bật nhắc lịch Zalo trước giờ hẹn 1 ngày và 2 tiếng.\n\nChỉ gửi cho khách những bước ở trên. Không hứa ngày triển khai.\n"
+    },
+    {
+      "relPath": "support-faq.md",
+      "body": "# Hỗ trợ cơ bản\n\n- Thêm nhân viên: Cài đặt > Nhân viên > Thêm nhân viên.\n- Sửa tin nhắc lịch: Cài đặt > Nhắc lịch > Mẫu tin nhắn.\n- Khách không nhận được tin Zalo: kiểm tra số điện thoại có đăng ký Zalo, nếu không hệ thống gửi SMS thay thế.\n- Xuất báo cáo lịch hẹn: Báo cáo > Lịch hẹn > chọn tuần > Xuất Excel.\n- Nhập lịch từ Excel: Cài đặt > Nhập dữ liệu.\n"
+    },
+    {
+      "relPath": "escalation-policy.md",
+      "body": "# Chuyển cho chủ công ty\n\nHoàn tiền, giảm giá, đổi giá hoặc hợp đồng, cam kết thời gian hoạt động, ngày sửa lỗi hay ra tính năng, huỷ gói, yêu cầu pháp lý: luôn chuyển cho chủ công ty, không tự trả lời hay hứa gì.\n"
+    }
+  ]
+}
