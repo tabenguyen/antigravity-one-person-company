@@ -245,6 +245,34 @@ describe("Orchestrator — task lifecycle", () => {
     db.close();
   });
 
+  it("while only the Gemini quota is low, an agent on a Claude model keeps claiming low-priority work", async () => {
+    process.env.FAKE_AGY_QUOTA_FRACTION = "0.01"; // Gemini drained; Claude/GPT stays at the fixture's 0.6
+    const config = makeTestConfig();
+    const db = openTestDb();
+    const bus = new EventBus();
+    const tokens = new RunTokenRegistry();
+    const gemini = createAgent({ config, db }, { id: "sdr-01", role: "sales-sdr", displayName: "Mai", maxConcurrency: 10 });
+    const claude = createAgent({ config, db }, { id: "sdr-02", role: "sales-sdr", displayName: "Lan", maxConcurrency: 10, model: "claude-sonnet-5-5-medium" });
+    expect(gemini.model.startsWith("gemini")).toBe(true);
+    const quota = new QuotaMonitor({ config, db, bus });
+    await quota.start();
+    expect(quota.isThrottled()).toBe(true);
+
+    const orchestrator = new Orchestrator({ config, db, bus, tokens, quota, backoffMinutes: [0, 0, 0] });
+    orchestrators.push(orchestrator);
+    setFakeResult({ status: "done", summary: "done" });
+    const geminiLow = db.tasks.create({ agentId: gemini.id, kind: "sdr.research_lead", title: "gemini low", input: RESEARCH_LEAD_INPUT, priority: 0 });
+    const claudeLow = db.tasks.create({ agentId: claude.id, kind: "sdr.research_lead", title: "claude low", input: RESEARCH_LEAD_INPUT, priority: 0 });
+
+    orchestrator.start();
+    await waitFor(() => db.tasks.get(claudeLow.id)!.status === "done");
+    await new Promise((r) => setTimeout(r, 150));
+    expect(db.tasks.get(geminiLow.id)!.status).toBe("queued");
+
+    quota.stop();
+    db.close();
+  });
+
   it("graceful shutdown requeues in-flight tasks instead of letting them backoff", async () => {
     const { db, agent, orchestrator } = setup({ runTimeoutMs: 20_000 });
     setFakeScenario("result");

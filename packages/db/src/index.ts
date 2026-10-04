@@ -4,7 +4,7 @@ export type { Db } from "./db.ts";
 export { TaskTransitionError, NotFoundError, OutboxTransitionError, ConflictError } from "./errors.ts";
 
 export type { CreateAgentInput, UpdateAgentInput, ListAgentsFilter } from "./repos/agents.ts";
-export type { CreateTaskInput, ListTasksFilter, TaskTransitionPatch } from "./repos/tasks.ts";
+export type { ClaimOptions, CreateTaskInput, ListTasksFilter, TaskTransitionPatch } from "./repos/tasks.ts";
 export type { ListAuditFilter } from "./repos/audit.ts";
 export type { KbDocument, UpsertDocumentInput, UpsertDocumentResult } from "./repos/kb.ts";
 export type { ListMemoryFilter } from "./repos/memory.ts";
