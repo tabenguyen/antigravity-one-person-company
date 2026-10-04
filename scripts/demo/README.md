@@ -1,4 +1,4 @@
-# Ảnh demo cho README
+# Ảnh demo (docs/DEMO.md)
 
 `npm run demo:screenshots` dựng lại 7 ảnh trong [`docs/images/`](../../docs/images/) bằng dữ liệu hư cấu:
 
@@ -52,6 +52,6 @@ Tuỳ chọn:
 | Kiến thức của Account Manager, Chánh văn phòng | [`fixtures/role-kb-am.json`](fixtures/role-kb-am.json), [`fixtures/role-kb-cos.json`](fixtures/role-kb-cos.json). Cần có, vì readiness từ chối bật outbound khi KB của một vai trò còn chữ TODO. |
 | Trang nào được chụp, cắt bao nhiêu | bảng `SHOTS` trong [`screenshots.ts`](screenshots.ts) |
 
-Thêm ảnh mới: thêm một mục vào `SHOTS` (tên file, cách đưa trang về đúng trạng thái, cách cắt: `clipHeight` hoặc `clipTo` là một selector; `viewportHeight` nếu trang dài, vì app cuộn bên trong layout của nó), rồi chèn ảnh vào README.
+Thêm ảnh mới: thêm một mục vào `SHOTS` (tên file, cách đưa trang về đúng trạng thái, cách cắt: `clipHeight` hoặc `clipTo` là một selector; `viewportHeight` nếu trang dài, vì app cuộn bên trong layout của nó), rồi chèn ảnh vào [`docs/DEMO.md`](../../docs/DEMO.md).
 
-Giữ nguyên quy ước: chỉ dùng tên và công ty hư cấu, email đuôi `.example`, và ghi rõ dưới ảnh trong README rằng đó là dữ liệu minh hoạ.
+Giữ nguyên quy ước: chỉ dùng tên và công ty hư cấu, email đuôi `.example`, và ghi rõ dưới ảnh trong `docs/DEMO.md` rằng đó là dữ liệu minh hoạ.

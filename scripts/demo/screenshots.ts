@@ -1,4 +1,4 @@
-// Regenerates the README demo screenshots in docs/images/ from fictional data:
+// Regenerates the demo screenshots (docs/DEMO.md) in docs/images/ from fictional data:
 // seeds a throwaway dataDir (.demo/), starts a separate daemon on its own port,
 // applies the demo company profile, then captures the UI with Playwright.
 // Your real dataDir and daemon are never touched.
