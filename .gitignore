@@ -8,6 +8,11 @@ workspaces/
 spike/**/node_modules/
 spike/**/.venv/
 
+# Secrets (AGYHQ_FB_PAGE_TOKEN, AGYHQ_FB_APP_SECRET, AGYHQ_IMAP_PASS, ...) — loaded by `hq` at start, see .env.example
+.env
+.env.*
+!.env.example
+
 # Local daemon config (mailbox, webhook secrets) — copy from agyhq.config.example.json
 agyhq.config.json
 
