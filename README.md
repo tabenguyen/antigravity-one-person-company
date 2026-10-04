@@ -187,10 +187,11 @@ Mỗi nhân viên có workspace riêng (persona, quy tắc, kỹ năng, hook), n
 
 - [x] **Sales SDR** — nghiên cứu lead, chào hàng, trả lời, follow-up, duyệt, eval
 - [x] Setup wizard: domain → hồ sơ công ty bằng AI
-- [ ] **Chăm sóc khách hàng / Account Manager** — onboarding, gia hạn, hỗ trợ tier-1 (đang làm)
-- [ ] Kế toán, Marketing nội dung
-- [ ] Kênh Zalo / Telegram / Facebook Page
-- [ ] "Chánh văn phòng" AI: tự phân việc giữa các nhân viên
+- [x] **Chăm sóc khách hàng / Account Manager** — onboarding, hỗ trợ tier-1, check-in định kỳ (v0.2.0)
+- [x] **"Chánh văn phòng" AI** — bản tin buổi sáng, chuyển việc giữa các nhân viên (v0.2.0)
+- [x] **Fanpage Manager** + kênh Facebook Page — soạn bài, trả lời bình luận, mọi thứ qua duyệt (v0.3.0, [docs/FANPAGE.md](docs/FANPAGE.md))
+- [ ] Kế toán, Marketing nội dung (blog, email marketing)
+- [ ] Kênh Zalo / Telegram; Facebook webhook thời gian thực
 
 Bạn muốn vai trò nào tiếp theo? Mở issue — hoặc tốt hơn, gửi PR một template trong `templates/`.
 
@@ -200,14 +201,14 @@ Bạn muốn vai trò nào tiếp theo? Mở issue — hoặc tốt hơn, gửi 
 - **Điều khoản sử dụng.** Bạn đang dùng tài khoản Antigravity của chính mình cho việc tự động hoá. Hãy tự đọc điều khoản của Google và tự chịu trách nhiệm với cách bạn dùng. Runner được thiết kế để có thể thay bằng runner khác nếu cần.
 - **Chạy dưới một user hệ điều hành riêng.** Cấu hình global của `agy` (`~/.gemini`) áp lên mọi workspace — đừng để nó lẫn với môi trường code hằng ngày của bạn. Xem [`docs/PHASE0.md`](docs/PHASE0.md).
 - **AI vẫn có thể sai.** Đó là lý do mặc định là shadow và bạn duyệt. Gửi email chào hàng phải tuân thủ quy định chống thư rác (Nghị định 91/2020/NĐ-CP) — chỉ liên hệ người có lý do chính đáng để liên hệ.
-- **Dự án còn trẻ.** Đã có hơn 850 test tự động và luồng end-to-end chạy với `agy` thật, nhưng IMAP/SMTP thật chưa được kiểm thử rộng rãi với nhiều nhà cung cấp. Báo lỗi giúp mình nhé.
+- **Dự án còn trẻ.** Đã có hơn 1.400 test tự động và luồng end-to-end chạy với `agy` thật, nhưng IMAP/SMTP thật chưa được kiểm thử rộng rãi với nhiều nhà cung cấp. Báo lỗi giúp mình nhé.
 
 ## Đóng góp
 
 Rất hoan nghênh, đặc biệt là:
 
 - **Template vai trò mới** (`templates/<vai-trò>/`): persona, quy tắc, kỹ năng, prompt, eval.
-- **Kênh mới** (`packages/channels`): Zalo OA, Telegram, Facebook.
+- **Kênh mới** (`packages/channels`): Zalo OA, Telegram.
 - Câu chuyện thật: bạn đang dùng cho công ty 1 người nào? Kể trong Discussions.
 
 ```bash
