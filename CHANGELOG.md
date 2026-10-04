@@ -19,6 +19,7 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ### Changed
 
+- Quota throttle is per model family. A drained Gemini bucket only holds back low-priority work of agents on Gemini models; agents on Claude/GPT models keep running on their own bucket (`QuotaMonitor.isThrottledFor(model)`, `tasks.claimNext(now, { skip })`). Unknown model ids still throttle when any bucket is low. Also fixes the throttled claim loop, which could claim low-priority tasks once any high-priority task was queued.
 - Readiness: placeholder text in a **role's** knowledge base no longer pauses all outbound. `kb.no_placeholders` now covers the company KB only; the new `kb.role_placeholders` check warns, and while outbound is on the readiness monitor pauses just that role's agents (re-pausing them if resumed early, audit `agent.auto_paused`). Before, filling in nothing for a new role (e.g. the Fanpage Manager) stopped the SDR's email too.
 - docs: README demo screenshots for the v0.2.0 features (SDR → Account Manager hand-off, KPIs by role, Chief of Staff briefing, shadow run); `npm run demo:screenshots` now produces 7 images.
 

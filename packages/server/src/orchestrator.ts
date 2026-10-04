@@ -125,14 +125,11 @@ export class Orchestrator {
   #claimUpTo(): void {
     const { db, config, quota } = this.#deps;
     while (this.#running.size < config.workerConcurrency) {
-      if (quota?.isThrottled()) {
-        const now = nowIso();
-        const hasHighPriorityCandidate = db.tasks
-          .list({ status: ["queued"] })
-          .some((t) => t.priority >= THROTTLE_PRIORITY_FLOOR && (!t.wakeAt || t.wakeAt <= now));
-        if (!hasHighPriorityCandidate) break;
-      }
-      const claimed = db.tasks.claimNext(nowIso());
+      // Throttled: low-priority work waits only when the quota family of its agent's model is the one running low.
+      const skip = quota?.isThrottled()
+        ? (c: { priority: number; agentModel: string }) => c.priority < THROTTLE_PRIORITY_FLOOR && quota.isThrottledFor(c.agentModel)
+        : undefined;
+      const claimed = db.tasks.claimNext(nowIso(), { skip });
       if (!claimed) break;
       this.#launch(claimed);
     }

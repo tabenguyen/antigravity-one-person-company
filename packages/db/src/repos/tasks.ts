@@ -7,6 +7,11 @@ import type { AuditRepo } from "./audit.ts";
 
 type SqliteDb = Database.Database;
 
+export interface ClaimOptions {
+  /** Return true to leave a queued task unclaimed this round. */
+  skip?: (candidate: { priority: number; agentModel: string }) => boolean;
+}
+
 interface TaskRow {
   id: string;
   agent_id: string;
@@ -219,12 +224,13 @@ export class TasksRepo {
    * the agent is active, the agent's running-task count is below maxConcurrency,
    * and no other running task shares its non-null threadKey.
    * Marks it running (attempts += 1) and returns it, or null if nothing is claimable.
+   * `opts.skip` drops candidates before those checks (the orchestrator's quota throttle).
    */
-  claimNext(now: Iso): Task | null {
+  claimNext(now: Iso, opts: ClaimOptions = {}): Task | null {
     const claim = this.#db.transaction((asOf: string): Task | null => {
       const candidates = this.#db
         .prepare(
-          `SELECT t.*, a.max_concurrency AS agent_max_concurrency
+          `SELECT t.*, a.max_concurrency AS agent_max_concurrency, a.model AS agent_model
            FROM tasks t
            JOIN agents a ON a.id = t.agent_id
            WHERE t.status = 'queued'
@@ -232,7 +238,7 @@ export class TasksRepo {
              AND (t.wake_at IS NULL OR t.wake_at <= @asOf)
            ORDER BY t.priority DESC, t.created_at ASC`,
         )
-        .all({ asOf }) as (TaskRow & { agent_max_concurrency: number })[];
+        .all({ asOf }) as (TaskRow & { agent_max_concurrency: number; agent_model: string })[];
 
       const runningCountStmt = this.#db.prepare(
         "SELECT COUNT(*) AS c FROM tasks WHERE agent_id = ? AND status = 'running'",
@@ -242,6 +248,7 @@ export class TasksRepo {
       );
 
       for (const row of candidates) {
+        if (opts.skip?.({ priority: row.priority, agentModel: row.agent_model })) continue;
         const running = (runningCountStmt.get(row.agent_id) as { c: number }).c;
         if (running >= row.agent_max_concurrency) continue;
         if (row.thread_key) {

@@ -6,8 +6,8 @@
 // since the orchestrator always passes --json-schema and needs to see every
 // TaskResult shape (done / needs_human / waiting_external / failed /
 // followUp) to exercise its outcome-mapping logic. /usage's remaining
-// fractions are controllable via FAKE_AGY_QUOTA_FRACTION for quota-throttle
-// tests.
+// fractions are controllable via FAKE_AGY_QUOTA_FRACTION (Gemini) and
+// FAKE_AGY_QUOTA_FRACTION_CLAUDE (Claude and GPT) for quota-throttle tests.
 
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -22,6 +22,7 @@ if (argv.includes("--version")) {
 
 if (argv.includes("/usage")) {
   const fraction = process.env.FAKE_AGY_QUOTA_FRACTION ? Number(process.env.FAKE_AGY_QUOTA_FRACTION) : 0.6;
+  const claudeFraction = process.env.FAKE_AGY_QUOTA_FRACTION_CLAUDE ? Number(process.env.FAKE_AGY_QUOTA_FRACTION_CLAUDE) : 0.6;
   const payload = {
     conversation_id: "",
     status: "SUCCESS",
@@ -45,6 +46,20 @@ if (argv.includes("/usage")) {
                 window: "weekly",
                 remaining_fraction: fraction,
                 reset_time: "2026-10-07T02:28:26Z",
+              },
+            ],
+          },
+          {
+            name: "Claude and GPT models",
+            description: "d",
+            buckets: [
+              {
+                id: "claude-weekly",
+                name: "Weekly Limit Remaining",
+                description: "d",
+                window: "weekly",
+                remaining_fraction: claudeFraction,
+                reset_time: "2026-10-10T15:16:31Z",
               },
             ],
           },
