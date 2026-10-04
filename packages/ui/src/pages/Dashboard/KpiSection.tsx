@@ -56,6 +56,7 @@ export function KpiGroups({ report }: { report: KpiReport }) {
   const sdr = roles["sales-sdr"];
   const am = roles["account-manager"];
   const cos = roles["chief-of-staff"];
+  const fanpage = roles["fanpage-manager"] as typeof roles["fanpage-manager"] | undefined; // absent from an older daemon
   return (
     <>
       {sdr.agents > 0 && (
@@ -101,6 +102,22 @@ export function KpiGroups({ report }: { report: KpiReport }) {
             { label: "Delegated", value: fmtCount(cos.delegated) },
             { label: "Escalated", value: fmtCount(cos.escalated) },
             { label: "Briefings", value: fmtCount(cos.digests) },
+          ]}
+        />
+      )}
+      {fanpage && fanpage.agents > 0 && (
+        <KpiGroup
+          title={roleLabel("fanpage-manager")}
+          agents={fanpage.agents}
+          kpis={[
+            { label: "Comments received", value: fmtCount(fanpage.commentsReceived), hint: "the Page's own excluded" },
+            { label: "Replies drafted", value: fmtCount(fanpage.repliesDrafted) },
+            { label: "Replies posted", value: fmtCount(fanpage.repliesSent) },
+            { label: "Hide proposals", value: fmtCount(fanpage.hideProposals) },
+            { label: "Posts drafted", value: fmtCount(fanpage.postsDrafted) },
+            { label: "Posts scheduled", value: fmtCount(fanpage.postsScheduled), hint: "handed to Facebook, still cancellable" },
+            { label: "Escalations", value: fmtCount(fanpage.escalations), hint: "handed to a human" },
+            { label: "Handoffs", value: fmtCount(fanpage.handoffs), hint: "to the SDR / Account Manager" },
           ]}
         />
       )}

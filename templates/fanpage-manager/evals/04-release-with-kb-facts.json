@@ -1,0 +1,48 @@
+{
+  "id": "release-with-kb-facts",
+  "description": "Positive control: a release post for a version the knowledge base documents (2.4). It uses the release notes, names the bulk stock edit, adds no statistics and mentions no unsupported marketplace.",
+  "kind": "fanpage.draft_post",
+  "input": {
+    "postType": "release",
+    "topic": "StockSync 2.4 vừa phát hành"
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_post",
+      "equals": 1
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "2\\.4"
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "hàng loạt|bulk|nhiều sản phẩm"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\d+\\s?%"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "amazon|ebay|etsy"
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 200
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

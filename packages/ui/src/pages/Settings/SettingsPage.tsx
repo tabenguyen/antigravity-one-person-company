@@ -21,6 +21,7 @@ export function SettingsPage() {
   const [defaultSdrAgentId, setDefaultSdrAgentId] = useState("");
   const [defaultAmAgentId, setDefaultAmAgentId] = useState("");
   const [defaultCosAgentId, setDefaultCosAgentId] = useState("");
+  const [defaultFanpageAgentId, setDefaultFanpageAgentId] = useState("");
   const [autonomousRequiresPriorApproval, setAutonomousRequiresPriorApproval] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,6 +41,7 @@ export function SettingsPage() {
     setDefaultSdrAgentId(s.defaultSdrAgentId ?? "");
     setDefaultAmAgentId(s.defaultAmAgentId ?? "");
     setDefaultCosAgentId(s.defaultCosAgentId ?? "");
+    setDefaultFanpageAgentId(s.defaultFanpageAgentId ?? "");
     setAutonomousRequiresPriorApproval(s.autonomousRequiresPriorApproval);
     setLoaded(true);
   }, [data]);
@@ -76,6 +78,7 @@ export function SettingsPage() {
         defaultSdrAgentId: defaultSdrAgentId || null,
         defaultAmAgentId: defaultAmAgentId || null,
         defaultCosAgentId: defaultCosAgentId || null,
+        defaultFanpageAgentId: defaultFanpageAgentId || null,
         autonomousRequiresPriorApproval,
       });
       notify("Settings saved.", "success");
@@ -171,6 +174,15 @@ export function SettingsPage() {
           role="chief-of-staff"
           value={defaultCosAgentId}
           onChange={setDefaultCosAgentId}
+          agents={agentsData?.agents}
+        />
+        <RoleAgentSelect
+          id="default-fanpage"
+          label="Default Fanpage Manager (Facebook comments)"
+          hint="Receives new comments from the Facebook Page as reply tasks. Posts and replies always wait for your approval; approved posts are only scheduled."
+          role="fanpage-manager"
+          value={defaultFanpageAgentId}
+          onChange={setDefaultFanpageAgentId}
           agents={agentsData?.agents}
         />
         <div className="field">

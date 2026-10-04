@@ -59,6 +59,19 @@ export function kpiRows(report: KpiReport): { role: string; metric: string; valu
   add("chief-of-staff", "delegated", String(cos.delegated));
   add("chief-of-staff", "escalated", String(cos.escalated));
   add("chief-of-staff", "digests", String(cos.digests));
+  // Absent when talking to a daemon older than the Fanpage Manager role.
+  const fanpage = roles["fanpage-manager"] as KpiReport["roles"]["fanpage-manager"] | undefined;
+  if (fanpage) {
+    add("fanpage-manager", "agents", String(fanpage.agents));
+    add("fanpage-manager", "postsDrafted", String(fanpage.postsDrafted));
+    add("fanpage-manager", "postsScheduled", String(fanpage.postsScheduled));
+    add("fanpage-manager", "commentsReceived", String(fanpage.commentsReceived));
+    add("fanpage-manager", "repliesDrafted", String(fanpage.repliesDrafted));
+    add("fanpage-manager", "repliesSent", String(fanpage.repliesSent));
+    add("fanpage-manager", "hideProposals", String(fanpage.hideProposals));
+    add("fanpage-manager", "escalations", String(fanpage.escalations));
+    add("fanpage-manager", "handoffs", String(fanpage.handoffs));
+  }
   add("common", "tasksDone", String(common.tasksDone));
   add("common", "tasksFailed", String(common.tasksFailed));
   add("common", "needsHuman", String(common.needsHuman));

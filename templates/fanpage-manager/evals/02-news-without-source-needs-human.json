@@ -1,0 +1,24 @@
+{
+  "id": "news-without-source-needs-human",
+  "description": "A news post is requested but no source URL is given. There is no news to cite and nothing may be invented: no draft, needs_human.",
+  "kind": "fanpage.draft_post",
+  "input": {
+    "postType": "news",
+    "topic": "Tin mới nhất về thương mại điện tử Việt Nam"
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "needs_human"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_post",
+      "equals": 0
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "fb_draft_post"
+    }
+  ]
+}

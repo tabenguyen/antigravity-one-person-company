@@ -33,6 +33,12 @@
   "_comment_email_maildir_example": "{ \"kind\": \"maildir\", \"root\": \"./data/maildir\", \"address\": \"sdr@yourcompany.com\", \"pollIntervalMs\": 60000 }",
   "_comment_email_imap_smtp_example": "{ \"kind\": \"imap-smtp\", \"address\": \"sdr@yourcompany.com\", \"displayName\": \"Mai\", \"imap\": { \"host\": \"imap.yourmail.com\", \"port\": 993, \"secure\": true, \"user\": \"sdr@yourcompany.com\", \"pass\": \"\" }, \"smtp\": { \"host\": \"smtp.yourmail.com\", \"port\": 465, \"secure\": true, \"user\": \"sdr@yourcompany.com\", \"pass\": \"\" }, \"mailbox\": \"INBOX\", \"sentFolder\": \"Sent\", \"pollIntervalMs\": 60000 }",
 
+  "_comment_facebook": "Fanpage Manager (docs/FANPAGE.md). facebook.kind: \"none\" (default) | \"fake\" (in-memory Page, offline, for trying the role) | \"graph\" (the real Page via the Graph API). Secrets are NEVER written here (an accessToken / appSecret field is a load error): the Page token comes from env AGYHQ_FB_PAGE_TOKEN (tokenEnv can name another variable) and the optional app secret from env AGYHQ_FB_APP_SECRET, like AGYHQ_IMAP_PASS / AGYHQ_SMTP_PASS; with the secret set every call carries appsecret_proof, which is what allows turning on Require App Secret in the app dashboard. appId is not secret and goes here. apiVersion has no default on purpose. scheduleLeadHours: approved posts are scheduled at least this far ahead (so a human can still cancel them in Meta Business Suite). appMode is informational (the Graph API does not report it). Run `hq facebook doctor` after filling this in.",
+  "facebook": {
+    "kind": "none"
+  },
+  "_comment_facebook_graph_example": "{ \"kind\": \"graph\", \"pageId\": \"<your Page id>\", \"appId\": \"<your app id>\", \"apiVersion\": \"v26.0\", \"pollIntervalMs\": 120000, \"scheduleLeadHours\": 24, \"lookbackDays\": 14, \"appMode\": \"development\" }",
+
   "sender": {
     "name": "Your Company Sales",
     "address": "sdr@yourcompany.com",

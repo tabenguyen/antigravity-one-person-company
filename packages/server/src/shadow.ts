@@ -34,8 +34,8 @@ export const SHADOW_MIN_SAMPLE = 10;
 export const SHADOW_PILING_COUNT = 10;
 export const SHADOW_PILING_HOURS = 24;
 
-/** Roles that draft outbound email (and so can be evaluated in a shadow run). */
-const DRAFTING_ROLES = new Set(["sales-sdr", "account-manager"]);
+/** Roles that draft outbound messages (email, Facebook posts and replies) and so can be evaluated in a shadow run. */
+const DRAFTING_ROLES = new Set(["sales-sdr", "account-manager", "fanpage-manager"]);
 
 // ---------------------------------------------------------------------------
 // Start / end

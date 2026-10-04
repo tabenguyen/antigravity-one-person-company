@@ -1,6 +1,6 @@
 import type { AgentRole, LeadStage } from "../api/types.ts";
 
-export const ROLES: AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff"];
+export const ROLES: AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"];
 
 export const ROLE_INFO: Record<AgentRole, { label: string; description: string }> = {
   "sales-sdr": {
@@ -14,6 +14,10 @@ export const ROLE_INFO: Record<AgentRole, { label: string; description: string }
   "chief-of-staff": {
     label: "Chief of Staff",
     description: "Internal only: triages inbound mail nothing else owns and writes your daily briefing.",
+  },
+  "fanpage-manager": {
+    label: "Fanpage Manager",
+    description: "Drafts Facebook Page posts (news, features, releases) and answers or moderates comments. Everything waits for your approval; approved posts are only scheduled.",
   },
 };
 

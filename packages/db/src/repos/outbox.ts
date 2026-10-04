@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import { OUTBOX_TRANSITIONS, SUPERSEDED_DECIDED_BY } from "@agyhq/core";
-import type { Iso, LintFinding, OutboxChannel, OutboxItem, OutboxStatus, RejectionCategory } from "@agyhq/core";
+import type { Iso, LintFinding, OutboxChannel, OutboxItem, OutboxPayload, OutboxStatus, RejectionCategory } from "@agyhq/core";
 import { newId, nowIso } from "@agyhq/core";
 import { ConflictError, NotFoundError, OutboxTransitionError } from "../errors.ts";
 
@@ -31,8 +31,19 @@ interface OutboxRow {
   lint: string;
   rejection_category: string | null;
   revisions: number;
+  payload: string | null;
   created_at: string;
   updated_at: string;
+}
+
+function parsePayload(raw: string | null | undefined): OutboxPayload | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as OutboxPayload) : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseLint(raw: string | null | undefined): LintFinding[] {
@@ -70,6 +81,7 @@ function mapRow(row: OutboxRow): OutboxItem {
     lint: parseLint(row.lint),
     rejectionCategory: (row.rejection_category as RejectionCategory | null) ?? null,
     revisions: row.revisions ?? 0,
+    payload: parsePayload(row.payload),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -85,6 +97,8 @@ export interface CreateDraftInput {
   reason: string;
   threadKey?: string | null;
   lint?: LintFinding[];
+  /** Facebook items: structured parts (post / comment preview). */
+  payload?: OutboxPayload | null;
 }
 
 export interface ReviseDraftInput {
@@ -93,6 +107,8 @@ export interface ReviseDraftInput {
   reason: string;
   threadKey: string | null;
   lint: LintFinding[];
+  /** Facebook items: replaces the payload (the new draft's structured parts). */
+  payload?: OutboxPayload | null;
 }
 
 export interface ListOutboxFilter {
@@ -151,6 +167,7 @@ export class OutboxRepo {
       lint: input.lint ?? [],
       rejectionCategory: null,
       revisions: 0,
+      payload: input.payload ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -159,13 +176,13 @@ export class OutboxRepo {
         `INSERT INTO outbox
            (id, agent_id, task_id, channel, "to", subject, body, reason, thread_key, status,
             original_subject, original_body, edited_by_human, decided_by, decided_at, decision_note,
-            status_reason, message_id, in_reply_to, sent_at, attempts, lint, created_at, updated_at)
+            status_reason, message_id, in_reply_to, sent_at, attempts, lint, payload, created_at, updated_at)
          VALUES
            (@id, @agentId, @taskId, @channel, @to, @subject, @body, @reason, @threadKey, @status,
             @originalSubject, @originalBody, @editedByHuman, @decidedBy, @decidedAt, @decisionNote,
-            @statusReason, @messageId, @inReplyTo, @sentAt, @attempts, @lint, @createdAt, @updatedAt)`,
+            @statusReason, @messageId, @inReplyTo, @sentAt, @attempts, @lint, @payload, @createdAt, @updatedAt)`,
       )
-      .run({ ...item, editedByHuman: 0, lint: JSON.stringify(item.lint), rejectionCategory: undefined, revisions: undefined });
+      .run({ ...item, editedByHuman: 0, lint: JSON.stringify(item.lint), rejectionCategory: undefined, revisions: undefined, payload: item.payload ? JSON.stringify(item.payload) : null });
     return item;
   }
 
@@ -209,6 +226,15 @@ export class OutboxRepo {
     return row ? mapRow(row) : null;
   }
 
+  /** Items addressed to `to` (case-insensitive) in any of `statuses` (default: all), newest first. */
+  listByRecipient(to: string, statuses?: OutboxStatus[]): OutboxItem[] {
+    const marks = statuses && statuses.length ? ` AND status IN (${statuses.map(() => "?").join(", ")})` : "";
+    const rows = this.#db
+      .prepare(`SELECT * FROM outbox WHERE lower("to") = lower(?)${marks} ORDER BY created_at DESC, rowid DESC`)
+      .all(to, ...(statuses ?? [])) as OutboxRow[];
+    return rows.map(mapRow);
+  }
+
   /** Drafts one task wrote to one recipient (case-insensitive), newest first. */
   listByTaskAndRecipient(taskId: string, to: string): OutboxItem[] {
     const rows = this.#db
@@ -233,13 +259,14 @@ export class OutboxRepo {
     }
     const updatedAt = nowIso();
     const revisions = existing.revisions + 1;
+    const payload = input.payload === undefined ? existing.payload : input.payload;
     this.#db
       .prepare(
         `UPDATE outbox SET subject = @subject, body = @body, original_subject = @subject, original_body = @body,
-           reason = @reason, thread_key = @threadKey, lint = @lint, revisions = @revisions, updated_at = @updatedAt
+           reason = @reason, thread_key = @threadKey, lint = @lint, revisions = @revisions, payload = @payload, updated_at = @updatedAt
          WHERE id = @id`,
       )
-      .run({ id, subject: input.subject, body: input.body, reason: input.reason, threadKey: input.threadKey, lint: JSON.stringify(input.lint), revisions, updatedAt });
+      .run({ id, subject: input.subject, body: input.body, reason: input.reason, threadKey: input.threadKey, lint: JSON.stringify(input.lint), revisions, payload: payload ? JSON.stringify(payload) : null, updatedAt });
     return {
       ...existing,
       subject: input.subject,
@@ -250,8 +277,18 @@ export class OutboxRepo {
       threadKey: input.threadKey,
       lint: input.lint,
       revisions,
+      payload,
       updatedAt,
     };
+  }
+
+  /** Replace the structured parts of a Facebook item (a human changing the planned time, the sender recording the post id). */
+  setPayload(id: string, payload: OutboxPayload): OutboxItem {
+    const existing = this.get(id);
+    if (!existing) throw new NotFoundError("outbox item", id);
+    const updatedAt = nowIso();
+    this.#db.prepare("UPDATE outbox SET payload = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(payload), updatedAt, id);
+    return { ...existing, payload, updatedAt };
   }
 
   /**
@@ -333,7 +370,7 @@ export class OutboxRepo {
            updated_at = @updatedAt
          WHERE id = @id`,
       )
-      .run({ ...updated, editedByHuman: undefined, lint: undefined });
+      .run({ ...updated, editedByHuman: undefined, lint: undefined, payload: undefined });
     return updated;
   }
 
@@ -387,12 +424,16 @@ export class OutboxRepo {
     return rows.map((r) => this.decide(r.id, "rejected", { decidedBy, decisionNote: reason }));
   }
 
-  /** Atomically claim the oldest `approved` item to send: approved -> sending. */
-  claimNextToSend(): OutboxItem | null {
+  /**
+   * Atomically claim the oldest `approved` item to send: approved -> sending. Each sender claims only its own channels
+   * (the email Sender: `email`, the default; the FacebookSender: the `facebook_*` channels).
+   */
+  claimNextToSend(channels: readonly OutboxChannel[] = ["email"]): OutboxItem | null {
     const claim = this.#db.transaction((): OutboxItem | null => {
+      const marks = channels.map(() => "?").join(", ");
       const row = this.#db
-        .prepare(`SELECT * FROM outbox WHERE status = 'approved' ORDER BY created_at ASC, rowid ASC LIMIT 1`)
-        .get() as OutboxRow | undefined;
+        .prepare(`SELECT * FROM outbox WHERE status = 'approved' AND channel IN (${marks}) ORDER BY created_at ASC, rowid ASC LIMIT 1`)
+        .get(...channels) as OutboxRow | undefined;
       if (!row) return null;
       const updatedAt = nowIso();
       this.#db.prepare(`UPDATE outbox SET status = 'sending', updated_at = ? WHERE id = ?`).run(updatedAt, row.id);
@@ -401,10 +442,15 @@ export class OutboxRepo {
     return claim();
   }
 
-  /** On daemon restart: any item left "sending" (process died mid-send) goes back to approved. Returns the recovered ids. */
-  recoverSending(): string[] {
+  /**
+   * On daemon restart: any email item left "sending" (process died mid-send) goes back to approved. Returns the recovered ids.
+   * Facebook items are left alone: re-sending one that may already be live would post it twice (FacebookSender.start handles them).
+   */
+  recoverSending(channels: readonly OutboxChannel[] = ["email"]): string[] {
     const recover = this.#db.transaction((): string[] => {
-      const stale = this.#db.prepare("SELECT id FROM outbox WHERE status = 'sending'").all() as { id: string }[];
+      const stale = this.#db
+        .prepare(`SELECT id FROM outbox WHERE status = 'sending' AND channel IN (${channels.map(() => "?").join(", ")})`)
+        .all(...channels) as { id: string }[];
       const ids: string[] = [];
       for (const { id } of stale) {
         this.decide(id, "approved", { statusReason: "recovered after daemon restart mid-send" });
@@ -415,19 +461,19 @@ export class OutboxRepo {
     return recover();
   }
 
-  /** Count of `sent` items with sentAt >= `since` (rate-limit window). */
-  countSentSince(since: Iso): number {
+  /** Count of `sent` items with sentAt >= `since` (rate-limit window), for the given channels (default: email). */
+  countSentSince(since: Iso, channels: readonly OutboxChannel[] = ["email"]): number {
     const row = this.#db
-      .prepare("SELECT COUNT(*) AS c FROM outbox WHERE status = 'sent' AND sent_at >= ?")
-      .get(since) as { c: number };
+      .prepare(`SELECT COUNT(*) AS c FROM outbox WHERE status = 'sent' AND sent_at >= ? AND channel IN (${channels.map(() => "?").join(", ")})`)
+      .get(since, ...channels) as { c: number };
     return row.c;
   }
 
-  /** Most recent `n` sent items, newest first (bounce-rate window). */
-  lastSent(n: number): OutboxItem[] {
+  /** Most recent `n` sent items of the given channels (default: email), newest first (bounce-rate window). */
+  lastSent(n: number, channels: readonly OutboxChannel[] = ["email"]): OutboxItem[] {
     const rows = this.#db
-      .prepare(`SELECT * FROM outbox WHERE status = 'sent' ORDER BY sent_at DESC, rowid DESC LIMIT ?`)
-      .all(n) as OutboxRow[];
+      .prepare(`SELECT * FROM outbox WHERE status = 'sent' AND channel IN (${channels.map(() => "?").join(", ")}) ORDER BY sent_at DESC, rowid DESC LIMIT ?`)
+      .all(...channels, n) as OutboxRow[];
     return rows.map(mapRow);
   }
 }

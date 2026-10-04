@@ -10,7 +10,16 @@ import type { AccountReviewEntry, DigestSnapshot } from "../admin-types.ts";
 import { DAILY_DIGEST_KIND } from "../briefings.ts";
 import { computeKpisSince } from "../kpis.ts";
 import { buildShadowDigest } from "../shadow.ts";
-import { parseProspectingConfig, AccountReviewConfigZ, CustomTaskConfigZ, DailyDigestConfigZ, PipelineReviewConfigZ } from "./config.ts";
+import { assignComments, CONTENT_CALENDAR_KIND } from "../facebook/intake.ts";
+import {
+  parseProspectingConfig,
+  AccountReviewConfigZ,
+  CommentPollConfigZ,
+  ContentCalendarConfigZ,
+  CustomTaskConfigZ,
+  DailyDigestConfigZ,
+  PipelineReviewConfigZ,
+} from "./config.ts";
 
 export const RESEARCH_KIND = "sdr.research_lead";
 export const PIPELINE_REVIEW_KIND = "sdr.pipeline_review";
@@ -375,6 +384,52 @@ function runDailyDigest(deps: RoutineRunDeps, routine: Routine, agent: Agent, no
 }
 
 // ---------------------------------------------------------------------------
+// content_calendar + comment_poll (Fanpage Manager, docs/FANPAGE.md section 7)
+
+const DAY_MS = 86_400_000;
+
+function runContentCalendar(deps: RoutineRunDeps, routine: Routine, agent: Agent, now: Date): { result: string; taskIds: string[] } {
+  const { db } = deps;
+  const open = db.tasks.list({ agentId: agent.id, status: ["queued", "running"] }).find((t) => t.kind === CONTENT_CALENDAR_KIND);
+  if (open) return { result: `skipped: previous content calendar (${open.id}) is still ${open.status}`, taskIds: [] };
+
+  const cfg = ContentCalendarConfigZ.safeParse(routine.config);
+  const { postsPerWeek, postTypes, daysAhead } = cfg.success ? cfg.data : { postsPerWeek: 3, postTypes: ["feature", "tip", "release"] as string[], daysAhead: 7 };
+  const weekStart = now.toISOString().slice(0, 10);
+  const weekEnd = new Date(now.getTime() + daysAhead * DAY_MS).toISOString().slice(0, 10);
+
+  // What is already planned: posts we scheduled that are not live yet, and drafts still waiting for / past a human.
+  const scheduled = db.facebook
+    .listPosts({ scheduledAfter: now.toISOString(), limit: 50 })
+    .map((p) => ({ postId: p.id, scheduledPublishTime: p.scheduledPublishTime, message: (p.message ?? "").slice(0, 200) }));
+  const pendingDrafts = db.outbox
+    .list({ agentId: agent.id, status: ["pending_approval", "approved"] })
+    .filter((i) => i.channel === "facebook_post" && i.payload?.kind === "post")
+    .map((i) => ({ outboxId: i.id, status: i.status, postType: i.payload?.kind === "post" ? i.payload.postType : null, publishAt: i.payload?.kind === "post" ? i.payload.publishAt : null, message: i.body.slice(0, 200) }));
+  const recent = db.facebook
+    .listPosts({ limit: 10 })
+    .filter((p) => p.isPublished)
+    .map((p) => ({ postId: p.id, createdTime: p.createdTime, message: (p.message ?? "").slice(0, 200) }));
+
+  const task = db.tasks.create({
+    agentId: agent.id,
+    kind: CONTENT_CALENDAR_KIND,
+    title: `Content calendar ${weekStart}`,
+    input: { routineName: routine.name, weekStart, weekEnd, postsPerWeek, postTypes, scheduled, pendingDrafts, recent },
+    priority: 0,
+  });
+  return { result: `queued content calendar ${weekStart}..${weekEnd} (${postsPerWeek} posts; ${scheduled.length} scheduled, ${pendingDrafts.length} drafts already)`, taskIds: [task.id] };
+}
+
+function runCommentPoll(deps: RoutineRunDeps, routine: Routine, agent: Agent): { result: string; taskIds: string[] } {
+  const cfg = CommentPollConfigZ.safeParse(routine.config);
+  const maxPerRun = cfg.success ? cfg.data.maxPerRun : 20;
+  const { taskIds, remaining } = assignComments(deps.db, agent, maxPerRun);
+  if (taskIds.length === 0) return { result: "no new comments waiting", taskIds };
+  return { result: `queued ${taskIds.length} comment repl${taskIds.length === 1 ? "y" : "ies"}${remaining > 0 ? ` (${remaining} more waiting)` : ""}`, taskIds };
+}
+
+// ---------------------------------------------------------------------------
 // custom_task
 
 function runCustomTask(deps: RoutineRunDeps, routine: Routine, agent: Agent): { result: string; taskIds: string[] } {
@@ -421,7 +476,11 @@ export function runRoutine(deps: RoutineRunDeps, routine: Routine, opts: { manua
                 ? runAccountReview(deps, routine, agent, now)
                 : routine.kind === "daily_digest"
                   ? runDailyDigest(deps, routine, agent, now)
-                  : runCustomTask(deps, routine, agent);
+                  : routine.kind === "content_calendar"
+                    ? runContentCalendar(deps, routine, agent, now)
+                    : routine.kind === "comment_poll"
+                      ? runCommentPoll(deps, routine, agent)
+                      : runCustomTask(deps, routine, agent);
         result = r.result;
         taskIds = r.taskIds;
       } catch (err) {

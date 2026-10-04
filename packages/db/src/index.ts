@@ -14,6 +14,7 @@ export type { QuotaSnapshot } from "./repos/quota.ts";
 export type { CreateBriefingInput } from "./repos/briefings.ts";
 export type { CreateShadowRunInput } from "./repos/shadowRuns.ts";
 export type { CreateHumanSentInput } from "./repos/humanSent.ts";
+export type { UpsertPostInput, InsertCommentInput } from "./repos/facebook.ts";
 export type { CreateRoutineInput, UpdateRoutineInput } from "./repos/routines.ts";
 export { summarizeResults } from "./repos/evalRuns.ts";
 export type { CreateInboundInput, ListInboundFilter, SetStatusPatch } from "./repos/inbound.ts";

@@ -32,7 +32,7 @@ export interface KbSyncSummary {
 
 /** Subdirectory of kbRoot holding per-role overrides: kbRoot/roles/<role>/*.md (never company-scope documents). */
 export const ROLE_OVERRIDE_SUBDIR = "roles";
-const KNOWN_ROLES: readonly AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff"];
+const KNOWN_ROLES: readonly AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"];
 
 export function isKnownRole(role: string): role is AgentRole {
   return (KNOWN_ROLES as readonly string[]).includes(role);

@@ -5,6 +5,8 @@ import type { LintFinding, TaskResult } from "@agyhq/core";
 import type { EvalAssertion } from "./types.ts";
 
 export interface ObservedDraft {
+  /** Outbox channel: email, or facebook_post / facebook_reply / facebook_hide. */
+  channel: string;
   to: string;
   subject: string | null;
   body: string;
@@ -35,6 +37,8 @@ export interface CaseObservation {
   toolCalls: string[];
   /** Tasks created by the case's task (task_create or followUp), for any agent. */
   childTasks: ObservedChildTask[];
+  /** Every task in the eval daemon (any agent, any parent), for "how many tasks of this kind exist" assertions. */
+  allTasks: { kind: string; agentId: string }[];
   /** Draft attempts the daemon's lint refused (audit "outbox.lint_blocked"): error-level findings, one entry per attempt. */
   lintBlocked: { to: string; codes: string[] }[];
 }
@@ -149,8 +153,18 @@ export function evaluateAssertion(a: EvalAssertion, obs: CaseObservation): Asser
       };
     }
     case "outbox.count": {
-      const c = countCheck(obs.drafts.length, a);
-      return { name: `outbox.count ${c.expect}`, ok: c.ok, detail: `actual: ${obs.drafts.length}${obs.drafts.length ? ` (to ${obs.drafts.map((d) => d.to).join(", ")})` : ""}` };
+      const drafts = a.channel ? obs.drafts.filter((d) => d.channel === a.channel) : obs.drafts;
+      const c = countCheck(drafts.length, a);
+      return {
+        name: `outbox.count${a.channel ? `[${a.channel}]` : ""} ${c.expect}`,
+        ok: c.ok,
+        detail: `actual: ${drafts.length}${drafts.length ? ` (to ${drafts.map((d) => d.to).join(", ")})` : ""}${a.channel ? `; all drafts: ${obs.drafts.map((d) => d.channel).join(", ") || "none"}` : ""}`,
+      };
+    }
+    case "task.total": {
+      const n = obs.allTasks.filter((t) => t.kind === a.kind).length;
+      const c = countCheck(n, a.equals === undefined && a.min === undefined && a.max === undefined ? { min: 1 } : a);
+      return { name: `task.total ${a.kind} ${c.expect}`, ok: c.ok, detail: `actual: ${n}; tasks: ${obs.allTasks.map((t) => t.kind).join(", ") || "none"}` };
     }
     case "draft.contains": {
       const hits = obs.drafts.map((d) => matchText(draftText(d), a));

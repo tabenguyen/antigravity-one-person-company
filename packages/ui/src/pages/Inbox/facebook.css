@@ -1,0 +1,72 @@
+/* Facebook drafts in the Inbox, and the Facebook page. */
+.fb-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-alt);
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.fb-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.fb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-accent-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fb-text {
+  margin: 0 0 var(--space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fb-meta {
+  margin: 2px 0;
+  font-size: 12px;
+}
+
+.fb-url {
+  font-family: var(--font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+
+.fb-reply-label {
+  font-weight: 600;
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.fb-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.fb-status > div {
+  min-width: 140px;
+}
+
+.fb-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fb-table th,
+.fb-table td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}

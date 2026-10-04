@@ -1,0 +1,35 @@
+{
+  "role": "fanpage-manager",
+  "description": "Fanpage Manager: drafts the company's Facebook Page posts (related industry news with a cited source, new features, release announcements, tips) and answers comments on the Page. Writes Vietnamese by default. Never publishes anything itself (a human approves every post, and approved posts are only ever scheduled), never invents news, facts, numbers or prices, never argues in public, and escalates complaints, price and refund questions; spam gets a hide proposal and sales leads are handed to the SDR.",
+  "defaultModel": "gemini-3.8-flash-medium",
+  "policy": {
+    "builtins": ["view_file", "list_dir", "grep_search", "find_by_name", "list_resources", "read_resource"],
+    "mcp": [
+      { "server": "company", "tool": "kb_search" },
+      { "server": "company", "tool": "memory_list" },
+      { "server": "company", "tool": "memory_propose" },
+      { "server": "company", "tool": "task_create" },
+      { "server": "company", "tool": "fb_draft_post" },
+      { "server": "company", "tool": "fb_draft_reply" },
+      { "server": "company", "tool": "fb_propose_hide" }
+    ]
+  },
+  "resultSchema": "result-schema.json",
+  "taskKinds": [
+    {
+      "kind": "fanpage.draft_post",
+      "description": "Draft ONE Facebook Page post of a given type: news (cites the source URL given in the input, no invented news), feature, release, tip or other. Facts and numbers only from the knowledge base; nothing to base it on means needs_human and no draft.",
+      "prompt": "prompts/draft_post.md"
+    },
+    {
+      "kind": "fanpage.reply_comment",
+      "description": "A visitor commented on the Page: classify it (question, praise, complaint, spam, sales lead, off-topic) and act: answer from the knowledge base, propose hiding spam, escalate complaints and price/refund questions, hand sales leads to the SDR.",
+      "prompt": "prompts/reply_comment.md"
+    },
+    {
+      "kind": "fanpage.content_calendar",
+      "description": "Plan the coming days' posts (scheduled routine): create one fanpage.draft_post task per planned post, based on what the knowledge base can support and what is already scheduled. Drafts no post itself.",
+      "prompt": "prompts/content_calendar.md"
+    }
+  ]
+}

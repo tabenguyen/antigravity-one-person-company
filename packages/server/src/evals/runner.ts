@@ -12,11 +12,13 @@ import os from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import type { AgentRole, EvalCaseResult, Iso, TaskResult } from "@agyhq/core";
+import { FakeFacebookProvider } from "@agyhq/channels";
 import type { Db } from "@agyhq/db";
 import { listTemplateRoles, loadTemplate } from "@agyhq/workspace";
 import type { AgyhqConfig } from "../config.ts";
 import { createAgent } from "../provision.ts";
 import { ValidationError } from "../util.ts";
+import type { Task } from "@agyhq/core";
 import { evaluateAssertions, type CaseObservation } from "./assertions.ts";
 import { loadSuite } from "./suite.ts";
 import type { EvalCase, LoadedSuite } from "./types.ts";
@@ -159,6 +161,11 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
     runTimeoutMs: Math.max(1000, ctx.caseTimeoutMs - 5_000),
     quota: { minRemainingFraction: 0, pollIntervalMs: 3_600_000 },
     email: { kind: "none", pollIntervalMs: 60_000 },
+    // The Fanpage Manager suite runs against the in-memory fake Page; the poll interval is long on purpose: the runner polls.
+    facebook:
+      loaded.name === "fanpage-manager"
+        ? { kind: "fake", pageId: "eval-page", pageName: "Eval Page", pollIntervalMs: 3_600_000, scheduleLeadHours: 24, lookbackDays: 14 }
+        : { kind: "none", pollIntervalMs: 120_000, scheduleLeadHours: 24, lookbackDays: 14 },
     webhooks: {},
   };
 
@@ -175,23 +182,14 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
     // Teammates the case refers to (e.g. a Chief of Staff's roster) exist so task_create can assign to them, but with
     // zero concurrency they can never claim a task: only the case's own agent costs model runs.
     const teammates = provisionTeammates({ config: daemon.config, db }, c, agent.id);
-    const owner = c.contact.ownerAgentId ?? (loaded.name === "chief-of-staff" ? null : agent.id);
-    if (owner && !db.agents.get(owner)) throw new Error(`case ${c.id}: contact.ownerAgentId "${owner}" is not the eval agent or a provisioned teammate (${teammates.join(", ") || "none"})`);
-    const seeded = seedCase(db, agent.id, c, { ownerAgentId: owner });
-    const task = db.tasks.create({
-      agentId: agent.id,
-      kind: c.kind,
-      title: `eval ${c.id}`,
-      input: { contactId: seeded.contactId, ...buildTaskInput(c) },
-      threadKey: `contact:${seeded.email}`,
-      priority: 10,
-      maxAttempts: 1,
-    });
-
+    if (loaded.name === "fanpage-manager") setFanpageDefaults(db, agent.id, c);
+    let task: Task;
+    let seeded: { email: string; contactId: string } | null = null;
     // The moment the task settles, pause the agent so no follow-up/child task the agent
     // queued can be claimed (and cost a model run) before we tear the daemon down.
+    let watchedTaskId: string | null = null;
     const unsubscribe = daemon.bus.subscribe((ev) => {
-      if (ev.type === "task.transition" && ev.data["taskId"] === task.id && SETTLED.has(String(ev.data["to"]))) {
+      if (ev.type === "task.transition" && watchedTaskId !== null && ev.data["taskId"] === watchedTaskId && SETTLED.has(String(ev.data["to"]))) {
         try {
           db.agents.setStatus(agent.id, "paused");
         } catch {
@@ -199,6 +197,28 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
         }
       }
     });
+    if (c.facebook) {
+      // Production path: the fake Page holds the post and its comments, the poller stores them (deduping by comment id) and
+      // creates the reply task for the default Fanpage agent.
+      task = await seedFacebookCase(daemon.facebook, db, c);
+    } else if (c.contact) {
+      const owner = c.contact.ownerAgentId ?? (loaded.name === "chief-of-staff" ? null : agent.id);
+      if (owner && !db.agents.get(owner)) throw new Error(`case ${c.id}: contact.ownerAgentId "${owner}" is not the eval agent or a provisioned teammate (${teammates.join(", ") || "none"})`);
+      seeded = seedCase(db, agent.id, c, { ownerAgentId: owner });
+      task = db.tasks.create({
+        agentId: agent.id,
+        kind: c.kind,
+        title: `eval ${c.id}`,
+        input: { contactId: seeded.contactId, ...buildTaskInput(c) },
+        threadKey: `contact:${seeded.email}`,
+        priority: 10,
+        maxAttempts: 1,
+      });
+    } else {
+      task = db.tasks.create({ agentId: agent.id, kind: c.kind, title: `eval ${c.id}`, input: c.input, priority: 10, maxAttempts: 1 });
+    }
+    watchedTaskId = task.id;
+    if (SETTLED.has(db.tasks.get(task.id)!.status)) db.agents.setStatus(agent.id, "paused");
 
     let outcome: "settled" | "timeout" | "aborted" = "timeout";
     const deadline = Date.now() + ctx.caseTimeoutMs;
@@ -221,7 +241,7 @@ async function runOneCase(ctx: CaseCtx): Promise<EvalCaseResult> {
     }
 
     const final = db.tasks.get(task.id)!;
-    const obs = observe(db, agent.id, final.id, seeded.email, final.status, final.result);
+    const obs = observe(db, agent.id, final.id, seeded?.email ?? null, final.status, final.result);
     const output = summarizeOutput(final.status, final.result, final.error, obs);
 
     if (outcome !== "settled") {
@@ -288,6 +308,7 @@ function provisionTeammates(ctx: { config: AgyhqConfig; db: Db }, c: EvalCase, _
 
 export function seedCase(db: Db, agentId: string, c: EvalCase, opts: { ownerAgentId?: string | null } = {}): { email: string; contactId: string } {
   const ct = c.contact;
+  if (!ct) throw new Error(`case ${c.id}: has no contact to seed`);
   const email = ct.email.toLowerCase();
   if (ct.companyName || ct.companyDomain) {
     db.crm.upsertCompany({
@@ -348,7 +369,43 @@ export function seedCase(db: Db, agentId: string, c: EvalCase, opts: { ownerAgen
   return { email, contactId: contact.id };
 }
 
+/** Fanpage cases hand work to teammates: make the provisioned SDR / Account Manager the defaults the poller puts in the task input. */
+function setFanpageDefaults(db: Db, agentId: string, c: EvalCase): void {
+  const patch: { defaultFanpageAgentId: string; defaultSdrAgentId?: string; defaultAmAgentId?: string } = { defaultFanpageAgentId: agentId };
+  for (const spec of teammateSpecs(c)) {
+    if (spec.role === "sales-sdr" && !patch.defaultSdrAgentId) patch.defaultSdrAgentId = spec.id;
+    if (spec.role === "account-manager" && !patch.defaultAmAgentId) patch.defaultAmAgentId = spec.id;
+  }
+  db.settings.patch(patch);
+}
+
+/** Stage the post + comments in the fake Page, poll twice (the first poll only sets the "from now" cursor) and return the task created. */
+async function seedFacebookCase(fb: { provider: unknown; poller: { pollNow(): Promise<unknown> } }, db: Db, c: EvalCase): Promise<Task> {
+  const provider = fb.provider;
+  if (!(provider instanceof FakeFacebookProvider)) throw new Error(`case ${c.id}: the eval daemon's Facebook provider is not the fake one`);
+  const seed = c.facebook!;
+  await fb.poller.pollNow(); // cursor = now: nothing staged later is "history"
+  const post = provider.addPost({ id: seed.post.id, message: seed.post.message, createdTime: new Date(Date.now() - 3_600_000).toISOString() });
+  for (const comment of seed.comments) {
+    for (let i = 0; i < comment.repeat; i++) {
+      provider.addComment({
+        postId: post.id,
+        id: comment.id,
+        message: comment.message,
+        parentId: comment.parentId ?? null,
+        ...(comment.from === undefined ? {} : { from: comment.from === null ? null : { id: comment.from.id, name: comment.from.name ?? null } }),
+      });
+    }
+  }
+  const polled = await fb.poller.pollNow();
+  const task = db.tasks.list({}).filter((t) => t.kind === c.kind).sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  if (!task) throw new Error(`case ${c.id}: polling the fake Page created no ${c.kind} task (${JSON.stringify(polled)})`);
+  db.sqlite.prepare("UPDATE tasks SET max_attempts = 1 WHERE id = ?").run(task.id);
+  return db.tasks.get(task.id)!;
+}
+
 export function buildTaskInput(c: EvalCase): Record<string, unknown> {
+  if (!c.contact) return { ...c.input };
   const ct = c.contact;
   const input: Record<string, unknown> = {
     contactName: ct.name ?? null,
@@ -377,12 +434,12 @@ export function buildTaskInput(c: EvalCase): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 // Observation
 
-function observe(db: Db, agentId: string, taskId: string, contactEmail: string, taskStatus: string, result: TaskResult | null): CaseObservation {
+function observe(db: Db, agentId: string, taskId: string, contactEmail: string | null, taskStatus: string, result: TaskResult | null): CaseObservation {
   const drafts = db.outbox
     .list({ agentId })
     .filter((i) => i.taskId === taskId)
     .reverse()
-    .map((i) => ({ to: i.to, subject: i.subject, body: i.body, status: i.status, lint: i.lint ?? [] }));
+    .map((i) => ({ channel: i.channel as string, to: i.to, subject: i.subject, body: i.body, status: i.status, lint: i.lint ?? [] }));
   const contacts = (db.sqlite.prepare("SELECT email, stage FROM contacts WHERE email IS NOT NULL").all() as { email: string; stage: string }[]).map((r) => ({
     email: r.email.toLowerCase(),
     stage: r.stage,
@@ -403,7 +460,8 @@ function observe(db: Db, agentId: string, taskId: string, contactEmail: string, 
       const findings = Array.isArray(e.data["findings"]) ? (e.data["findings"] as { code?: string; severity?: string }[]) : [];
       return { to: String(e.data["to"] ?? ""), codes: findings.filter((f) => f.severity === "error").map((f) => String(f.code)) };
     });
-  return { taskStatus, result, drafts, contacts, contactEmail: contactEmail.toLowerCase(), toolCalls, childTasks, lintBlocked };
+  const allTasks = db.tasks.list({}).map((t) => ({ kind: t.kind, agentId: t.agentId }));
+  return { taskStatus, result, drafts, contacts, contactEmail: (contactEmail ?? "").toLowerCase(), toolCalls, childTasks, allTasks, lintBlocked };
 }
 
 function summarizeOutput(taskStatus: string, result: TaskResult | null, error: string | null, obs: CaseObservation): unknown {

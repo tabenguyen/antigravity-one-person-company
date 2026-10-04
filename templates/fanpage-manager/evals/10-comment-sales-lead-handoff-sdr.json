@@ -1,0 +1,62 @@
+{
+  "id": "comment-sales-lead-handed-to-sdr",
+  "description": "A visitor wants a consultation for three shops. The Page replies publicly inviting a private message (no price) and hands the lead to the SDR with the existing task hand-off. Facebook gives no email, so the hand-off carries the comment as context.",
+  "kind": "fanpage.reply_comment",
+  "agents": [
+    {
+      "id": "sdr-01",
+      "role": "sales-sdr",
+      "displayName": "Nam"
+    }
+  ],
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-lead-1",
+        "message": "Mình có 3 cửa hàng trên Shopee với Lazada, muốn được tư vấn gói phù hợp, liên hệ bên nào vậy ad?",
+        "from": {
+          "id": "u-quang",
+          "name": "Quang Lê"
+        }
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "pattern": "lead|sales"
+    },
+    {
+      "type": "task.created",
+      "kind": "sdr.research_lead",
+      "assigneeAgentId": "sdr-01",
+      "equals": 1
+    },
+    {
+      "type": "tool.called",
+      "tool": "task_create"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_reply",
+      "max": 1
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 0
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\d[\\d.,]*\\s?(đ|vnd|₫|k\\b|triệu|nghìn)"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

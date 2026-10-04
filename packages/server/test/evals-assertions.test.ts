@@ -7,7 +7,7 @@ function obs(overrides: Partial<CaseObservation> = {}): CaseObservation {
     taskStatus: "waiting_approval",
     result: { status: "needs_human", summary: "Prospect asked about price", data: { classification: "interested", nested: { a: 1 } } },
     drafts: [
-      { to: "lan@x.example", subject: "Re: sync", body: "Hi Lan, happy to talk Tuesday. Pricing comes from our sales team after the call. Mai", status: "pending_approval", lint: [] },
+      { channel: "email", to: "lan@x.example", subject: "Re: sync", body: "Hi Lan, happy to talk Tuesday. Pricing comes from our sales team after the call. Mai", status: "pending_approval", lint: [] },
     ],
     contacts: [
       { email: "lan@x.example", stage: "replied" },
@@ -19,6 +19,7 @@ function obs(overrides: Partial<CaseObservation> = {}): CaseObservation {
       { kind: "sdr.follow_up", title: "f", createdAt: "2026-10-01T00:00:00.000Z", wakeAt: "2026-12-30T00:00:00.000Z" },
       { kind: "sdr.follow_up", title: "g", createdAt: "2026-10-01T00:00:00.000Z", wakeAt: "2026-10-02T00:00:00.000Z" },
     ],
+    allTasks: [{ kind: "sdr.handle_reply", agentId: "eval-agent" }],
     lintBlocked: [],
     ...overrides,
   };
@@ -102,7 +103,7 @@ describe("eval assertions", () => {
   it("draft.lintErrors counts only error findings; missing lint is a pass with a note", () => {
     expect(ev({ type: "draft.lintErrors", equals: 0 }).detail).toContain("lint recorded no findings");
     const withLint = obs({
-      drafts: [{ to: "a@b.c", subject: "s", body: "b", status: "pending_approval", lint: [{ code: "unknown_price", severity: "error", message: "m" }, { code: "too_long", severity: "warn", message: "m" }] }],
+      drafts: [{ channel: "email", to: "a@b.c", subject: "s", body: "b", status: "pending_approval", lint: [{ code: "unknown_price", severity: "error", message: "m" }, { code: "too_long", severity: "warn", message: "m" }] }],
     });
     expect(ev({ type: "draft.lintErrors", equals: 0 }, withLint)).toMatchObject({ ok: false });
     expect(ev({ type: "draft.lintErrors", equals: 0 }, withLint).detail).toContain("1 stored draft error(s) (unknown_price)");
@@ -147,5 +148,27 @@ describe("eval assertions", () => {
     const a: EvalAssertion = { type: "any", of: [{ type: "contact.exists", email: "nobody@x.example" }, { type: "tool.called", tool: "kb_search" }] };
     expect(ev(a).ok).toBe(true);
     expect(ev({ type: "any", of: [{ type: "contact.exists", email: "n@x.example" }, { type: "tool.called", tool: "zzz" }] }).ok).toBe(false);
+  });
+
+  it("outbox.count can be limited to one channel (a hide proposal is not a reply)", () => {
+    const o = obs({
+      drafts: [
+        { channel: "facebook_hide", to: "fb:hide:c1", subject: "Hide", body: "quảng cáo", status: "pending_approval", lint: [] },
+        { channel: "facebook_post", to: "fb:page:p", subject: "Post", body: "nội dung", status: "pending_approval", lint: [] },
+      ],
+    });
+    expect(ev({ type: "outbox.count", channel: "facebook_hide", equals: 1 }, o).ok).toBe(true);
+    expect(ev({ type: "outbox.count", channel: "facebook_reply", equals: 0 }, o).ok).toBe(true);
+    expect(ev({ type: "outbox.count", channel: "facebook_reply", min: 1 }, o)).toMatchObject({ ok: false });
+    expect(ev({ type: "outbox.count", equals: 2 }, o).ok).toBe(true); // no channel = all drafts
+    expect(ev({ type: "outbox.count", channel: "facebook_reply", equals: 0 }, o).name).toContain("[facebook_reply]");
+  });
+
+  it("task.total counts tasks of a kind anywhere (default: at least one)", () => {
+    const o = obs({ allTasks: [{ kind: "fanpage.reply_comment", agentId: "a" }, { kind: "sdr.research_lead", agentId: "b" }] });
+    expect(ev({ type: "task.total", kind: "fanpage.reply_comment", equals: 1 }, o).ok).toBe(true);
+    expect(ev({ type: "task.total", kind: "fanpage.reply_comment", max: 0 }, o).ok).toBe(false);
+    expect(ev({ type: "task.total", kind: "sdr.research_lead" }, o).ok).toBe(true);
+    expect(ev({ type: "task.total", kind: "fanpage.draft_post" }, o).ok).toBe(false);
   });
 });

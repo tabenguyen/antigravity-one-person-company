@@ -16,6 +16,8 @@ export interface ResolvedDeps {
   attachmentsRoot: string | null;
   taskKindsFor: (agent: Agent) => readonly string[] | null;
   followUpKindsFor: (agent: Agent | null) => readonly string[];
+  /** The Facebook Page id (target of post drafts); null when no Facebook channel is configured. */
+  facebookPageId: () => string | null;
 }
 
 export function resolveDeps(deps: AgentApiDeps): ResolvedDeps {
@@ -29,5 +31,6 @@ export function resolveDeps(deps: AgentApiDeps): ResolvedDeps {
     attachmentsRoot: deps.attachmentsRoot ?? null,
     taskKindsFor: deps.taskKindsFor ?? (() => null),
     followUpKindsFor: deps.followUpKindsFor ?? (() => ["sdr.follow_up"]),
+    facebookPageId: deps.facebookPageId ?? (() => null),
   };
 }

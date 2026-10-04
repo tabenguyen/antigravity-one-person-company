@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { EmailProviderConfig } from "@agyhq/channels";
+import type { EmailProviderConfig, FacebookProviderConfig } from "@agyhq/channels";
 
 // ---------------------------------------------------------------------------
 // Repo root discovery (this repo has no .git — see environment note — so we
@@ -82,6 +82,39 @@ const EmailConfigFileZ = z.discriminatedUnion("kind", [
   }),
 ]);
 
+// -- Fanpage Manager: Facebook Page (docs/FANPAGE.md section 9) ----------------------------------------------------
+// Secrets are never in the file (the schemas are strict, so an `accessToken` / `appSecret` field is an error, not silently
+// ignored): the Page token comes from env AGYHQ_FB_PAGE_TOKEN (or the env var `tokenEnv` names) and the optional app secret
+// from env AGYHQ_FB_APP_SECRET, the same pattern as AGYHQ_IMAP_PASS / AGYHQ_SMTP_PASS. `appId` is not secret and lives here.
+
+const FacebookCommonZ = {
+  /** How often the poller fetches new comments. */
+  pollIntervalMs: z.number().int().min(10_000).optional(),
+  /** Approved posts are scheduled at least this many hours ahead (so a human can still cancel them in Meta Business Suite). */
+  scheduleLeadHours: z.number().min(1).max(24 * 74).optional(),
+  /** The poller looks at posts created in the last N days for new comments. */
+  lookbackDays: z.number().int().min(1).max(60).optional(),
+};
+
+const FacebookConfigFileZ = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none"), ...FacebookCommonZ }).strict(),
+  z.object({ kind: z.literal("fake"), pageId: z.string().min(1).optional(), pageName: z.string().optional(), ...FacebookCommonZ }).strict(),
+  z
+    .object({
+    kind: z.literal("graph"),
+    pageId: z.string().min(1),
+    /** The Meta app's id (not a secret). */
+    appId: z.string().min(1).optional(),
+    /** Graph API version, e.g. "v26.0". */
+    apiVersion: z.string().regex(/^v\d+\.\d+$/, 'apiVersion looks like "v26.0"'),
+    tokenEnv: z.string().min(1).optional(),
+    /** Declared app mode; the Graph API does not expose it (docs/FANPAGE.md "Pending spike"). */
+    appMode: z.enum(["development", "live"]).optional(),
+    ...FacebookCommonZ,
+    })
+    .strict(),
+]);
+
 const SenderConfigZ = z.object({
   name: z.string().min(1),
   address: z.string().min(1),
@@ -117,6 +150,7 @@ const ConfigFileZ = z
     quota: QuotaConfigZ,
     outboxDailyLimit: z.number().int().positive(),
     email: EmailConfigFileZ,
+    facebook: FacebookConfigFileZ,
     sender: SenderConfigZ,
     unsubscribeMailto: z.string().min(1),
     webhooks: WebhookConfigZ,
@@ -130,6 +164,9 @@ export type ConfigFile = z.infer<typeof ConfigFileZ>;
 
 /** `config.email`: an EmailProviderConfig plus the poll interval for the inbound poller. */
 export type EmailConfig = EmailProviderConfig & { pollIntervalMs: number };
+
+/** `config.facebook`: a FacebookProviderConfig (no token: see `tokenEnv`) plus the poller / scheduling knobs. */
+export type FacebookConfig = FacebookProviderConfig & { pollIntervalMs: number; scheduleLeadHours: number; lookbackDays: number };
 
 export interface SenderConfig {
   name: string;
@@ -175,6 +212,8 @@ export interface AgyhqConfig {
 
   // -- Phase 2 -----------------------------------------------------------
   email: EmailConfig;
+  /** Facebook Page channel for the Fanpage Manager role; `kind: "none"` (default) = the role cannot publish or poll. */
+  facebook: FacebookConfig;
   sender: SenderConfig;
   /** e.g. "unsubscribe@acme.com" — used to build the List-Unsubscribe mailto link and footer text. */
   unsubscribeMailto: string;
@@ -198,6 +237,9 @@ const DEFAULTS = {
   quota: { minRemainingFraction: 0.15, pollIntervalMs: 300_000 },
   outboxDailyLimit: 50,
   emailPollIntervalMs: 60_000,
+  facebookPollIntervalMs: 120_000,
+  facebookScheduleLeadHours: 24,
+  facebookLookbackDays: 14,
   unsubscribeMailto: "",
   routing: { replyKind: "sdr.handle_reply", newLeadKind: "sdr.research_lead", followUpKind: "sdr.follow_up" },
 } as const;
@@ -308,6 +350,14 @@ export function loadConfig(opts: LoadConfigOptions = {}): AgyhqConfig {
     email = { ...emailFile, pollIntervalMs: emailPollIntervalMs } as EmailConfig;
   }
 
+  const facebookFile = file.facebook ?? { kind: "none" as const };
+  const facebook = {
+    ...facebookFile,
+    pollIntervalMs: facebookFile.pollIntervalMs ?? DEFAULTS.facebookPollIntervalMs,
+    scheduleLeadHours: facebookFile.scheduleLeadHours ?? DEFAULTS.facebookScheduleLeadHours,
+    lookbackDays: facebookFile.lookbackDays ?? DEFAULTS.facebookLookbackDays,
+  } as FacebookConfig;
+
   const sender: SenderConfig = {
     name: file.sender?.name ?? companyName,
     address: file.sender?.address ?? "",
@@ -342,6 +392,7 @@ export function loadConfig(opts: LoadConfigOptions = {}): AgyhqConfig {
     outboxDailyLimit,
     configPath,
     email,
+    facebook,
     sender,
     unsubscribeMailto,
     webhooks,

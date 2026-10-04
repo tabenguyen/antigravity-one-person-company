@@ -1,0 +1,48 @@
+{
+  "id": "news-post-cites-source",
+  "description": "A news post is drafted from a source URL, title and excerpt a human supplied. It must quote that URL, stay within the excerpt (the excerpt has no numbers, so any percentage is invented) and pass the draft checks.",
+  "kind": "fanpage.draft_post",
+  "input": {
+    "postType": "news",
+    "topic": "Thương mại điện tử Việt Nam quý III",
+    "sourceUrl": "https://baomoi-eval.example/kinh-doanh/thuong-mai-dien-tu-tang-truong-quy-3.html",
+    "sourceTitle": "Thương mại điện tử Việt Nam tiếp tục tăng trưởng trong quý III",
+    "sourceExcerpt": "Theo báo cáo của một đơn vị nghiên cứu thị trường, số đơn hàng trên các sàn thương mại điện tử tại Việt Nam trong quý III tăng so với cùng kỳ năm trước, trong đó nhóm hàng gia dụng và thời trang dẫn đầu. Các nhà bán hàng nhỏ cho biết áp lực quản lý tồn kho trên nhiều sàn cũng tăng theo.",
+    "notes": "Giọng thân thiện, nối với chuyện quản lý tồn kho."
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_post",
+      "equals": 1
+    },
+    {
+      "type": "tool.called",
+      "tool": "fb_draft_post"
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "baomoi-eval\\.example/kinh-doanh/thuong-mai-dien-tu-tang-truong-quy-3"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "\\d+\\s?%"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|as an ai"
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 200
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

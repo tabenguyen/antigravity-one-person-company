@@ -7,7 +7,7 @@
 import type { Db } from "@agyhq/db";
 import { isReplacedDraft } from "@agyhq/core";
 import type { OutboxItem } from "@agyhq/core";
-import type { AmKpis, CommonKpis, CosKpis, KpiReport, SdrKpis } from "./admin-types.ts";
+import type { AmKpis, CommonKpis, CosKpis, FanpageKpis, KpiReport, SdrKpis } from "./admin-types.ts";
 import { median, summarizeDecisions } from "./quality/scorecard.ts";
 
 const DAY_MS = 86_400_000;
@@ -152,6 +152,34 @@ export function computeKpisSince(db: Db, since: Date, now: Date = new Date()): K
     digests: (db.sqlite.prepare(`SELECT COUNT(*) AS c FROM briefings WHERE created_at >= ?`).get(sinceIso) as { c: number }).c,
   };
 
+  // -- fanpage-manager ---------------------------------------------------------------
+  const fbDrafts = (channel: string) => drafts.filter((i) => roleOf.get(i.agentId) === "fanpage-manager" && i.channel === channel).length;
+  const fbSent = (channel: string) =>
+    (
+      db.sqlite
+        .prepare(`SELECT COUNT(*) AS c FROM outbox WHERE status = 'sent' AND channel = ? AND COALESCE(sent_at, updated_at) >= ?`)
+        .get(channel, sinceIso) as { c: number }
+    ).c;
+  const fanpageHandoffs = (
+    db.sqlite
+      .prepare(
+        `SELECT COUNT(*) AS c FROM tasks c JOIN tasks p ON p.id = c.parent_task_id JOIN agents a ON a.id = p.agent_id
+         WHERE c.created_at >= ? AND a.role = 'fanpage-manager' AND p.kind = 'fanpage.reply_comment' AND c.agent_id != p.agent_id`,
+      )
+      .get(sinceIso) as { c: number }
+  ).c;
+  const fanpage: FanpageKpis = {
+    agents: agentCount("fanpage-manager"),
+    postsDrafted: fbDrafts("facebook_post"),
+    postsScheduled: fbSent("facebook_post"),
+    commentsReceived: db.facebook.countCommentsSince(sinceIso),
+    repliesDrafted: fbDrafts("facebook_reply"),
+    repliesSent: fbSent("facebook_reply"),
+    hideProposals: fbDrafts("facebook_hide"),
+    escalations: escalationRows.filter((r) => r.role === "fanpage-manager").length,
+    handoffs: fanpageHandoffs,
+  };
+
   // -- common ------------------------------------------------------------------------
   const decisions = summarizeDecisions(drafts);
   const common: CommonKpis = {
@@ -162,5 +190,5 @@ export function computeKpisSince(db: Db, since: Date, now: Date = new Date()): K
     medianEditRatio: decisions.medianEditRatio,
   };
 
-  return { windowDays, roles: { "sales-sdr": sdr, "account-manager": am, "chief-of-staff": cos }, common };
+  return { windowDays, roles: { "sales-sdr": sdr, "account-manager": am, "chief-of-staff": cos, "fanpage-manager": fanpage }, common };
 }

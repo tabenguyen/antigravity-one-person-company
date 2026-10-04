@@ -3,7 +3,12 @@ import { api, ApiError } from "../../api/client.ts";
 import { useToast } from "../../components/Toast.tsx";
 import type { Agent } from "../../api/types.ts";
 
-const KNOWN_KINDS = ["sdr.research_lead", "sdr.first_touch", "sdr.follow_up", "sdr.handle_reply"];
+const KNOWN_KINDS = ["sdr.research_lead", "sdr.first_touch", "sdr.follow_up", "sdr.handle_reply", "fanpage.draft_post"];
+
+/** Input skeletons for kinds that need specific fields; picking the kind pre-fills the (still empty) input box. */
+const INPUT_TEMPLATES: Record<string, Record<string, unknown>> = {
+  "fanpage.draft_post": { postType: "news", topic: "", sourceUrl: "", sourceTitle: "", sourceExcerpt: "", publishAt: "", notes: "" },
+};
 
 export function NewTaskForm({ agents, onClose, onCreated }: { agents: Agent[]; onClose: () => void; onCreated: () => void }) {
   const { notify } = useToast();
@@ -84,7 +89,17 @@ export function NewTaskForm({ agents, onClose, onCreated }: { agents: Agent[]; o
             </div>
             <div className="field">
               <label htmlFor="task-kind">Kind</label>
-              <select id="task-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+              <select
+                id="task-kind"
+                value={kind}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setKind(next);
+                  // Pre-fill the input skeleton for kinds that need specific fields, unless the box already holds something of the user's.
+                  const skeleton = INPUT_TEMPLATES[next];
+                  if (skeleton && (input.trim() === "" || input.trim() === "{}")) setInput(JSON.stringify(skeleton, null, 2));
+                }}
+              >
                 {KNOWN_KINDS.map((k) => (
                   <option key={k} value={k}>
                     {k}

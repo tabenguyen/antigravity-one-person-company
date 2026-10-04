@@ -12,6 +12,8 @@ import { lintOutboxItem } from "./quality/index.ts";
 import { registerRoutinesRoutes } from "./admin-routines.ts";
 import { registerCoordinationRoutes } from "./admin-coordination.ts";
 import { registerShadowRoutes } from "./admin-shadow.ts";
+import { registerFacebookRoutes } from "./admin-facebook.ts";
+import type { FacebookRuntime } from "./facebook/runtime.ts";
 import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -83,6 +85,8 @@ export interface AdminApiDeps {
   /** Test seams for the setup wizard. */
   setupOverrides?: SetupOverrides;
   sender?: Sender | null;
+  /** Fanpage Manager: the Facebook provider / poller / sender. Absent in tests that do not need it. */
+  facebook?: FacebookRuntime;
   runningTasks?: () => number;
   quotaThrottled?: () => boolean;
   startedAt?: string;
@@ -190,6 +194,7 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
   registerCoordinationRoutes(app, deps);
   registerEmailDoctorRoutes(app, deps);
   registerShadowRoutes(app, deps);
+  registerFacebookRoutes(app, deps);
 
   // -- Agents --------------------------------------------------------------
 
@@ -397,7 +402,13 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
     const parsed = EditOutboxRequestZ.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) return fail(c, "invalid_request", zodMessage(parsed.error), 400);
     return guarded(c, () => {
-      const edited = deps.db.outbox.edit(id, parsed.data);
+      const { publishAt, ...textPatch } = parsed.data;
+      let edited = deps.db.outbox.edit(id, textPatch);
+      if (publishAt !== undefined) {
+        // Facebook post drafts: the human may move the planned time (the sender still never schedules earlier than now + the lead time).
+        if (!edited.payload || edited.payload.kind !== "post") throw new ValidationError("publishAt only applies to Facebook post drafts");
+        edited = deps.db.outbox.setPayload(id, { ...edited.payload, publishAt });
+      }
       const item = deps.db.outbox.setLint(id, lintOutboxItem(deps.db, edited)); // re-lint after the human edit
       deps.db.audit.append({
         kind: "outbox.edited",
@@ -542,8 +553,8 @@ export function createAdminApi(rawDeps: AdminApiDeps): Hono {
       if (body.defaultSdrAgentId && !deps.db.agents.get(body.defaultSdrAgentId)) {
         throw new ValidationError(`agent not found: ${body.defaultSdrAgentId}`);
       }
-      // The Account Manager / Chief of Staff defaults must be an active agent of that role (or null to clear).
-      for (const [key, role] of [["defaultAmAgentId", "account-manager"], ["defaultCosAgentId", "chief-of-staff"]] as const) {
+      // The Account Manager / Chief of Staff / Fanpage Manager defaults must be an active agent of that role (or null to clear).
+      for (const [key, role] of [["defaultAmAgentId", "account-manager"], ["defaultCosAgentId", "chief-of-staff"], ["defaultFanpageAgentId", "fanpage-manager"]] as const) {
         const id = body[key];
         if (!id) continue;
         const agent = deps.db.agents.get(id);

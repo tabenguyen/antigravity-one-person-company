@@ -18,6 +18,7 @@ import { Orchestrator } from "./orchestrator.ts";
 import { QuotaMonitor } from "./quota.ts";
 import { EmailPoller } from "./inbound.ts";
 import { Sender } from "./sender.ts";
+import { FacebookRuntime } from "./facebook/runtime.ts";
 import { ReadinessMonitor } from "./readiness/monitor.ts";
 import { createVerifier } from "./admin-readiness.ts";
 import { createUiStaticMiddleware } from "./static-ui.ts";
@@ -38,6 +39,8 @@ export interface AppHandle {
   emailRuntime: EmailRuntime;
   setupJobs: SetupJobManager;
   sender: Sender;
+  /** Fanpage Manager: Facebook provider, comment poller and sender (all idle when facebook.kind is "none"). */
+  facebook: FacebookRuntime;
   readinessMonitor: ReadinessMonitor;
   routineScheduler: RoutineScheduler;
 }
@@ -57,6 +60,7 @@ export function buildApp(config: AgyhqConfig, db: Db): AppHandle {
   const readinessMonitor = new ReadinessMonitor({ config, db, bus, verifyEmail: createVerifier(() => emailRuntime.provider, 300_000) });
   const sender = new Sender({ config, db, bus, provider: () => emailRuntime.provider, beforeSend: () => readinessMonitor.checkIfStale() });
   const routineScheduler = new RoutineScheduler({ db, bus });
+  const facebook = new FacebookRuntime({ config, db, bus });
 
   const app = new Hono();
   app.route(
@@ -69,6 +73,7 @@ export function buildApp(config: AgyhqConfig, db: Db): AppHandle {
       emailRuntime,
       setupJobs,
       sender,
+      facebook,
       runningTasks: () => orchestrator.runningCount,
       quotaThrottled: () => quota.isThrottled(),
     }),
@@ -81,6 +86,7 @@ export function buildApp(config: AgyhqConfig, db: Db): AppHandle {
       outboxDailyLimit: config.outboxDailyLimit,
       attachmentsRoot: attachmentsRoot(config.dataDir),
       emit: (t, d) => bus.emit(t, d),
+      facebookPageId: () => facebook.pageId,
       taskKindsFor: (agent) => roleTaskKinds(config, agent.role),
       followUpKindsFor: (agent) => roleRouting(config, agent?.role ?? "sales-sdr")?.followUpKinds ?? [config.routing.followUpKind],
     }),
@@ -100,6 +106,7 @@ export function buildApp(config: AgyhqConfig, db: Db): AppHandle {
     emailRuntime,
     setupJobs,
     sender,
+    facebook,
     routineScheduler,
     readinessMonitor,
   };

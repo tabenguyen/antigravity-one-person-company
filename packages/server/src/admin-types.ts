@@ -22,7 +22,7 @@ import type {
   TrustTier,
 } from "@agyhq/core";
 
-const AgentRoleZ = z.enum(["sales-sdr", "account-manager", "chief-of-staff"]);
+const AgentRoleZ = z.enum(["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"]);
 const TrustTierZ = z.enum(["shadow", "assisted", "autonomous"]);
 const AgentStatusZ = z.enum(["active", "paused", "archived"]);
 const TaskStatusZ = z.enum([
@@ -197,8 +197,13 @@ import type { HqSettings, InboundClassification, InboundEvent, InboundStatus, No
 // POST  /v1/admin/outbox/:id/retry      → OutboxActionResponse                            (failed → approved)
 // GET   /v1/admin/outbox?status=&agentId=&limit=  (status may be comma-separated)        → ListOutboxResponse
 export const EditOutboxRequestZ = z
-  .object({ subject: z.string().min(1).max(200).optional(), body: z.string().min(1).max(10000).optional() })
-  .refine((v) => v.subject !== undefined || v.body !== undefined, "subject or body required");
+  .object({
+    subject: z.string().min(1).max(200).optional(),
+    body: z.string().min(1).max(10000).optional(),
+    /** Facebook post drafts: when it should go live (ISO 8601); null clears it (the sender then uses now + the lead time). */
+    publishAt: z.string().datetime({ offset: true }).nullable().optional(),
+  })
+  .refine((v) => v.subject !== undefined || v.body !== undefined || v.publishAt !== undefined, "subject, body or publishAt required");
 export type EditOutboxRequest = z.infer<typeof EditOutboxRequestZ>;
 export const ApproveOutboxRequestZ = z.object({ note: z.string().max(2000).optional(), reviewer: z.string().max(100).optional() });
 export type ApproveOutboxRequest = z.infer<typeof ApproveOutboxRequestZ>;
@@ -360,6 +365,7 @@ export const PatchSettingsRequestZ = z
     defaultSdrAgentId: z.string().min(1).nullable(),
     defaultAmAgentId: z.string().min(1).nullable(),
     defaultCosAgentId: z.string().min(1).nullable(),
+    defaultFanpageAgentId: z.string().min(1).nullable(),
     autonomousRequiresPriorApproval: z.boolean(),
   })
   .partial()
@@ -455,7 +461,7 @@ export type { LintFinding };
 // POST   /v1/admin/evals body StartEvalRequest    → EvalRunResponse (starts async; poll or watch SSE "eval.updated")
 export const CreateRoutineRequestZ = z.object({
   agentId: z.string().min(1),
-  kind: z.enum(["prospecting", "pipeline_review", "account_review", "daily_digest", "custom_task"]),
+  kind: z.enum(["prospecting", "pipeline_review", "account_review", "daily_digest", "content_calendar", "comment_poll", "custom_task"]),
   name: z.string().min(1).max(200),
   schedule: z.string().min(9).max(100), // 5-field cron
   timezone: z.string().default("Asia/Ho_Chi_Minh"),
@@ -540,7 +546,7 @@ export type ListSetupJobsResponse = ApiEnvelope<{ jobs: SetupJob[] }>;
 //     replaces kbRoot/roles/<role>/ with exactly these files, re-syncs the KB, audits "kb.edited".
 // KB ingestion rule: if kbRoot/roles/<role>/ has any .md, those are scope role:<role> and the template kb for that role is NOT ingested.
 export const PutRoleKbRequestZ = z.object({
-  role: z.enum(["sales-sdr", "account-manager", "chief-of-staff"]),
+  role: z.enum(["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"]),
   files: z
     .array(z.object({ relPath: z.string().regex(/^[\w-]+\.md$/), body: z.string().min(1).max(200_000) }))
     .min(1)
@@ -692,6 +698,25 @@ export interface CosKpis {
   /** Briefings stored. */
   digests: number;
 }
+/** Fanpage Manager (docs/FANPAGE.md section 8). */
+export interface FanpageKpis {
+  agents: number;
+  /** Outbox post drafts created in the window. */
+  postsDrafted: number;
+  /** Posts handed to Facebook as scheduled posts (sent in the window). */
+  postsScheduled: number;
+  /** Comments the poller stored in the window (the Page's own comments excluded). */
+  commentsReceived: number;
+  /** Reply drafts created / replies actually posted in the window. */
+  repliesDrafted: number;
+  repliesSent: number;
+  /** Hide proposals drafted in the window. */
+  hideProposals: number;
+  /** Times a fanpage task was handed to a human (needs_human). */
+  escalations: number;
+  /** Tasks a fanpage.reply_comment task created for another agent (SDR / Account Manager). */
+  handoffs: number;
+}
 export interface CommonKpis {
   tasksDone: number;
   tasksFailed: number;
@@ -704,7 +729,7 @@ export interface CommonKpis {
 }
 export interface KpiReport {
   windowDays: number;
-  roles: { "sales-sdr": SdrKpis; "account-manager": AmKpis; "chief-of-staff": CosKpis };
+  roles: { "sales-sdr": SdrKpis; "account-manager": AmKpis; "chief-of-staff": CosKpis; "fanpage-manager": FanpageKpis };
   common: CommonKpis;
 }
 export type KpiResponse = ApiEnvelope<KpiReport>;

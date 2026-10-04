@@ -4,6 +4,7 @@
 import type { Agent, CompanyProfile, KbScope, LintFinding, OutboxItem } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
 import { lintDraft, type LintContext } from "./lint.ts";
+import { lintFanpageDraft } from "./fanpage-lint.ts";
 
 export interface BuildLintContextArgs {
   agent: Pick<Agent, "id" | "role">;
@@ -104,9 +105,58 @@ export function lintNewDraft(
   return lintDraft({ subject: args.subject, body: args.body, to: args.to }, buildLintContext(db, args));
 }
 
+const SEVERITY_ORDER: Record<LintFinding["severity"], number> = { error: 0, warn: 1, info: 2 };
+
+export interface FacebookLintArgs {
+  agent: Pick<Agent, "id" | "role">;
+  kind: "post" | "reply";
+  body: string;
+  postType?: string | null;
+  sourceUrl?: string | null;
+  link?: string | null;
+}
+
+/**
+ * Lint a Facebook post or public reply: the shared content rules (placeholders, prices and forbidden claims against the KB,
+ * AI self-reference, guarantee language) plus the fanpage rules (news source, unsourced statistics, promises in replies).
+ * There is no subject, no recipient thread and no "first touch" on a Page, so those rules stay quiet.
+ */
+export function lintFacebookDraft(db: Db, args: FacebookLintArgs): LintFinding[] {
+  const profile = db.kv.get<CompanyProfile>("company_profile");
+  let kbCache: string | null = null;
+  const kbText = () => (kbCache ??= loadKbText(db, args.agent));
+  const base = lintDraft(
+    { subject: null, body: args.body },
+    {
+      kbText,
+      profile: profile ? { meetingLink: profile.meetingLink, forbiddenClaims: profile.forbiddenClaims } : null,
+      role: args.agent.role,
+      hasPriorThread: true,
+      firstTouch: false,
+    },
+  );
+  const extra = lintFanpageDraft({ kind: args.kind, postType: args.postType, sourceUrl: args.sourceUrl, link: args.link }, args.body, kbText);
+  return [...base, ...extra].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
+
 /** Re-lint a stored outbox item with the current KB/profile/contact data (after a human edit, or on demand). */
-export function lintOutboxItem(db: Db, item: Pick<OutboxItem, "id" | "agentId" | "to" | "subject" | "body" | "threadKey">): LintFinding[] {
+export function lintOutboxItem(
+  db: Db,
+  item: Pick<OutboxItem, "id" | "agentId" | "to" | "subject" | "body" | "threadKey"> & Partial<Pick<OutboxItem, "channel" | "payload">>,
+): LintFinding[] {
   const agent = db.agents.get(item.agentId);
+  if (item.channel && item.channel !== "email") {
+    // A hide proposal carries an internal reason, not public text: nothing to lint.
+    if (!agent || !item.payload || item.payload.kind === "hide") return [];
+    return lintFacebookDraft(db, {
+      agent,
+      kind: item.payload.kind === "post" ? "post" : "reply",
+      body: item.body,
+      postType: item.payload.kind === "post" ? item.payload.postType : null,
+      sourceUrl: item.payload.kind === "post" ? item.payload.sourceUrl : null,
+      link: item.payload.kind === "post" ? item.payload.link : null,
+    });
+  }
   if (!agent) return lintDraft({ subject: item.subject, body: item.body, to: item.to });
   return lintNewDraft(db, { agent, to: item.to, threadKey: item.threadKey, excludeOutboxId: item.id, subject: item.subject, body: item.body });
 }

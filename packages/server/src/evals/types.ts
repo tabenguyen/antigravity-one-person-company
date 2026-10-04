@@ -44,7 +44,9 @@ const CountZ = z.object({
   max: z.number().int().min(0).optional(),
 });
 
-const OutboxCountZ = CountZ.extend({ type: z.literal("outbox.count") });
+const OutboxChannelZ = z.enum(["email", "facebook_post", "facebook_reply", "facebook_hide"]);
+/** Counts the case task's drafts; `channel` restricts it to one outbox channel (e.g. a hide proposal vs a reply). */
+const OutboxCountZ = CountZ.extend({ type: z.literal("outbox.count"), channel: OutboxChannelZ.optional() });
 const DraftContainsZ = z.object({ type: z.literal("draft.contains"), ...TextMatcherShape }).refine(oneMatcher, MATCHER_MSG);
 const DraftNotContainsZ = z.object({ type: z.literal("draft.notContains"), ...TextMatcherShape }).refine(oneMatcher, MATCHER_MSG);
 const DraftMaxWordsZ = z.object({ type: z.literal("draft.maxWords"), max: z.number().int().min(1) });
@@ -67,6 +69,9 @@ const TaskCreatedZ = CountZ.extend({
   minWakeHours: z.number().min(0).optional(),
 });
 
+/** Counts tasks of this kind anywhere in the eval daemon (the case's own task included), e.g. "one comment, one reply task". */
+const TaskTotalZ = CountZ.extend({ type: z.literal("task.total"), kind: z.string().min(1) });
+
 const LeafAssertionZ = z.union([
   ResultStatusZ,
   ResultDataZ,
@@ -81,6 +86,7 @@ const LeafAssertionZ = z.union([
   ToolCalledZ,
   ToolNotCalledZ,
   TaskCreatedZ,
+  TaskTotalZ,
 ]);
 
 export type LeafAssertion = z.infer<typeof LeafAssertionZ>;
@@ -90,11 +96,35 @@ export const AssertionZ: z.ZodType<EvalAssertion, z.ZodTypeDef, unknown> = z.laz
   z.union([LeafAssertionZ, z.object({ type: z.literal("any"), of: z.array(AssertionZ).min(2) })]),
 );
 
+const AgentRoleZ = z.enum(["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"]);
+
+/**
+ * Fanpage cases: a post and the comments under it, staged in the daemon's FakeFacebookProvider. The runner polls it
+ * (so the dedupe and the task creation are the production path) and the case's task is the one the poller created.
+ */
+const FacebookSeedZ = z.object({
+  post: z.object({ id: z.string().min(1).optional(), message: z.string().min(1) }),
+  comments: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        message: z.string(),
+        /** The commenter; null = Facebook stripped the author. Default: an anonymous stranger. */
+        from: z.object({ id: z.string().min(1), name: z.string().nullable().optional() }).nullable().optional(),
+        parentId: z.string().min(1).nullable().optional(),
+        /** Deliver the same comment id this many times in one poll (duplicate delivery). Default 1. */
+        repeat: z.number().int().min(1).max(5).default(1),
+      }),
+    )
+    .min(1),
+});
+
 export const EvalCaseZ = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9._-]*$/i, "id must be a simple slug"),
   description: z.string().min(1),
   /** Task kind to run, e.g. "sdr.handle_reply". */
   kind: z.string().min(1),
+  /** Optional for roles that do not work on contacts (the Fanpage Manager). */
   contact: z.object({
     /** An agent id from `agents` / the roster that owns the contact. Default: the eval agent (none for chief-of-staff). */
     ownerAgentId: z.string().min(1).optional(),
@@ -110,7 +140,8 @@ export const EvalCaseZ = z.object({
     companySize: z.string().optional(),
     companyCountry: z.string().optional(),
     attributes: z.record(z.unknown()).optional(),
-  }),
+  }).optional(),
+  facebook: FacebookSeedZ.optional(),
   thread: z
     .object({
       sent: z.array(z.object({ subject: z.string(), body: z.string() })).default([]),
@@ -122,9 +153,9 @@ export const EvalCaseZ = z.object({
    * delegate to. Agents named in `input.roster` ({agentId, role, displayName}) are provisioned automatically.
    */
   agents: z
-    .array(z.object({ id: z.string().min(1), role: z.enum(["sales-sdr", "account-manager", "chief-of-staff"]), displayName: z.string().min(1).optional() }))
+    .array(z.object({ id: z.string().min(1), role: AgentRoleZ, displayName: z.string().min(1).optional() }))
     .default([]),
-  /** Task input; contactId, contact name/email, company, replyBody and threadSummary are filled from the seed when absent. */
+  /** Task input; contactId, contact name/email, company, replyBody and threadSummary are filled from the seed when absent. For a `facebook` case the task is created by the poller and this is ignored. */
   input: z.record(z.unknown()).default({}),
   assertions: z.array(AssertionZ).min(1),
 });

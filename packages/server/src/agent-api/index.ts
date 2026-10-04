@@ -37,6 +37,8 @@ export interface AgentApiDeps {
   taskKindsFor?: (agent: Agent) => readonly string[] | null;
   /** Follow-up kinds of an agent's role (template `routing.followUpKinds`); cancelled on a contact handoff. Default: sdr.follow_up. */
   followUpKindsFor?: (agent: Agent | null) => readonly string[];
+  /** The configured Facebook Page id (post drafts target `fb:page:<id>`); omit/null when there is no Facebook channel. */
+  facebookPageId?: () => string | null;
 }
 
 /** Builds the Hono app serving /v1/hooks/* and /v1/mcp/*. See the package README for the route list. */

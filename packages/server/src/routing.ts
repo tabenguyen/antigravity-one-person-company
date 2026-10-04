@@ -77,12 +77,15 @@ export function cancelThreadTasks(db: Db, threadKey: string | null, kinds?: read
   return cancelled;
 }
 
-/** Active agents (other than chiefs of staff) with the task kinds their role defines — what `cos.triage` may delegate to. */
+/**
+ * Active agents (other than chiefs of staff) with the task kinds their role defines — what `cos.triage` may delegate to.
+ * Fanpage managers are left out: they work on Facebook comments (which have their own intake), never on inbound mail.
+ */
 export function buildRoster(config: TemplateCtx, db: Db): RosterEntry[] {
   const kindsByRole = new Map<string, string[]>();
   const roster: RosterEntry[] = [];
   for (const agent of db.agents.list({ status: "active" })) {
-    if (agent.role === "chief-of-staff") continue;
+    if (agent.role === "chief-of-staff" || agent.role === "fanpage-manager") continue;
     if (!kindsByRole.has(agent.role)) kindsByRole.set(agent.role, roleTaskKinds(config, agent.role) ?? []);
     roster.push({ agentId: agent.id, role: agent.role, displayName: agent.displayName, kinds: kindsByRole.get(agent.role)! });
   }

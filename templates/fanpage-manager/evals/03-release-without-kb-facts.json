@@ -1,0 +1,28 @@
+{
+  "id": "release-without-kb-facts",
+  "description": "A release announcement is requested for a version the knowledge base knows nothing about (3.0, an order assistant, an Amazon connection). The Page must not invent features: no draft, needs_human, and it says what is missing.",
+  "kind": "fanpage.draft_post",
+  "input": {
+    "postType": "release",
+    "topic": "Ra mắt StockSync 3.0 với trợ lý đặt hàng tự động và kết nối Amazon"
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "needs_human"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_post",
+      "equals": 0
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "fb_draft_post"
+    }
+  ]
+}

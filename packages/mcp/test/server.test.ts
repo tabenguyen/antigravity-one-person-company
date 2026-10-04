@@ -29,6 +29,9 @@ const VALID_INPUT: { [N in McpToolName]: unknown } = {
     body: "Hi Jane, following up on our call.",
     reason: "scheduled follow-up",
   },
+  fb_draft_post: { postType: "tip", message: "Mẹo nhỏ cho tuần này.", reason: "weekly tip" },
+  fb_draft_reply: { commentId: "123_456", message: "Cảm ơn bạn đã quan tâm!", reason: "praise" },
+  fb_propose_hide: { commentId: "123_457", reason: "spam link" },
 };
 
 async function connectedClient(server: ReturnType<typeof createCompanyMcpServer>): Promise<Client> {

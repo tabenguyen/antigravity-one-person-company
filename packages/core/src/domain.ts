@@ -5,7 +5,7 @@ import type { LintFinding, RejectionCategory } from "./quality.ts";
 
 export type Iso = string; // ISO-8601 timestamp
 
-export type AgentRole = "sales-sdr" | "account-manager" | "chief-of-staff";
+export type AgentRole = "sales-sdr" | "account-manager" | "chief-of-staff" | "fanpage-manager";
 
 /** Trust tiers are enforced by agy-hq (outbox policy), not by agy flags. See docs/PHASE0.md D4. */
 export type TrustTier = "shadow" | "assisted" | "autonomous";
@@ -233,7 +233,56 @@ export interface Note {
 // `held` is terminal on purpose: promoting an agent out of shadow must never
 // release old practice drafts.
 
-export type OutboxChannel = "email";
+/**
+ * `email` is sent by the email Sender; the `facebook_*` channels are sent by the FacebookSender (docs/FANPAGE.md):
+ * a post (always as a scheduled post), a public reply to a comment, or hiding a comment. For the Facebook channels
+ * `to` is `fb:page:<pageId>` / `fb:comment:<commentId>` / `fb:hide:<commentId>`, `subject` is a short label, `body` is
+ * the post / reply text (or the reason for a hide) and `payload` carries the structured parts.
+ */
+export type OutboxChannel = "email" | "facebook_post" | "facebook_reply" | "facebook_hide";
+
+export const FACEBOOK_OUTBOX_CHANNELS: readonly OutboxChannel[] = ["facebook_post", "facebook_reply", "facebook_hide"];
+
+export function isFacebookChannel(channel: OutboxChannel): boolean {
+  return channel !== "email";
+}
+
+export type FbPostType = "news" | "feature" | "release" | "tip" | "other";
+export const FB_POST_TYPES: readonly FbPostType[] = ["news", "feature", "release", "tip", "other"];
+
+/** Structured parts of a Facebook outbox item (core OutboxItem.payload). `null` for email. */
+export type OutboxPayload =
+  | {
+      kind: "post";
+      postType: FbPostType;
+      /** Link attached to the post (the `link` field of the Graph API); null = text only. */
+      link: string | null;
+      /** News posts: the article the post cites. The post body must contain it. */
+      sourceUrl: string | null;
+      /** When the agent proposes it goes live. The sender never schedules earlier than now + the configured lead time. */
+      publishAt: Iso | null;
+      /** Set once the post was handed to Facebook: when it will go live, and the Facebook post id. */
+      scheduledPublishTime?: Iso | null;
+      fbPostId?: string | null;
+    }
+  | {
+      kind: "reply";
+      commentId: string;
+      postId: string | null;
+      /** The comment being answered, so the reviewer sees it without opening Facebook. */
+      commentText: string;
+      commenterName: string | null;
+      fbReplyId?: string | null;
+    }
+  | {
+      kind: "hide";
+      commentId: string;
+      postId: string | null;
+      commentText: string;
+      commenterName: string | null;
+      /** Why the agent proposes hiding it (spam, abuse, ...). */
+      reason: string;
+    };
 export type OutboxStatus =
   | "pending_approval"
   | "approved"
@@ -288,6 +337,8 @@ export interface OutboxItem {
   rejectionCategory: RejectionCategory | null;
   /** How many times the agent rewrote this draft in place while it was still pending (same task, same recipient). */
   revisions: number;
+  /** Structured parts of a Facebook item (post / comment preview); null for email. */
+  payload: OutboxPayload | null;
   createdAt: Iso;
   updatedAt: Iso;
 }
@@ -415,7 +466,13 @@ export type AuditKind =
   | "email.test_sent"
   | "briefing.created"
   | "shadow.started"
-  | "shadow.ended";
+  | "shadow.ended"
+  | "facebook.comment_received"
+  | "facebook.post_scheduled"
+  | "facebook.replied"
+  | "facebook.hidden"
+  | "facebook.scheduled_cancelled"
+  | "facebook.preview_created";
 
 // ---------------------------------------------------------------------------
 // Daemon settings (persisted, editable from agy-ui / CLI)
@@ -436,6 +493,8 @@ export interface HqSettings {
   defaultAmAgentId: string | null;
   /** Chief of Staff: triages inbound nothing else owns (`cos.triage`). */
   defaultCosAgentId: string | null;
+  /** Fanpage Manager: receives new Facebook comments (`fanpage.reply_comment`) and the content calendar. */
+  defaultFanpageAgentId: string | null;
   /** Autonomous agents may only auto-send to contacts that already received a human-approved email. */
   autonomousRequiresPriorApproval: boolean;
 }
@@ -449,6 +508,7 @@ export const DEFAULT_SETTINGS: HqSettings = {
   defaultSdrAgentId: null,
   defaultAmAgentId: null,
   defaultCosAgentId: null,
+  defaultFanpageAgentId: null,
   autonomousRequiresPriorApproval: true,
 };
 
@@ -473,5 +533,56 @@ export interface Briefing {
   periodStart: Iso;
   periodEnd: Iso;
   markdown: string;
+  createdAt: Iso;
+}
+
+// ---------------------------------------------------------------------------
+// Facebook storage (docs/FANPAGE.md). What the poller saw and what we posted; the Page itself stays the source of truth.
+
+/**
+ * Where a stored comment is in our pipeline.
+ *   new       stored, no task yet (no active Fanpage agent, or waiting for the `comment_poll` routine)
+ *   assigned  a `fanpage.reply_comment` task exists for it
+ *   own       written by the Page or by us (never answered; breaks reply loops)
+ *   skipped   nothing to answer (no text, already hidden on Facebook)
+ *   replied   our reply was posted
+ *   hidden    we hid it
+ */
+export type FbCommentStatus = "new" | "assigned" | "own" | "skipped" | "replied" | "hidden";
+
+export interface FbCommentRecord {
+  /** Facebook comment id: the dedupe key, one comment is one record is at most one task. */
+  id: string;
+  postId: string;
+  parentId: string | null;
+  message: string;
+  authorId: string | null;
+  authorName: string | null;
+  createdTime: Iso;
+  status: FbCommentStatus;
+  statusReason: string | null;
+  taskId: string | null;
+  agentId: string | null;
+  ingestedAt: Iso;
+}
+
+export interface FbPostRecord {
+  id: string;
+  message: string | null;
+  permalinkUrl: string | null;
+  createdTime: Iso;
+  isPublished: boolean;
+  scheduledPublishTime: Iso | null;
+  /** "page": seen in the feed; "agent": created by us (outboxId says which draft). */
+  source: "page" | "agent";
+  outboxId: string | null;
+  seenAt: Iso;
+}
+
+/** The reply mapping: which Facebook comment our reply (comment id `replyId`) answers, and the outbox item behind it. */
+export interface FbReplyRecord {
+  commentId: string;
+  replyId: string;
+  outboxId: string | null;
   createdAt: Iso;
 }

@@ -28,6 +28,10 @@ export const FIXTURE_ROLES: Record<AgentRole, FixtureRole> = {
     mcp: ["task_create"],
   },
   "chief-of-staff": { kinds: ["cos.triage", "cos.daily_digest"], mcp: ["task_create"] },
+  "fanpage-manager": {
+    kinds: ["fanpage.draft_post", "fanpage.reply_comment", "fanpage.content_calendar"],
+    mcp: ["task_create", "fb_draft_post", "fb_draft_reply", "fb_propose_hide"],
+  },
 };
 
 export function writeFixtureTemplates(root: string, roles: Partial<Record<AgentRole, FixtureRole>> = FIXTURE_ROLES): void {

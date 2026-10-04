@@ -1,0 +1,48 @@
+{
+  "id": "comment-praise-short-thanks",
+  "description": "Positive control: a happy customer says thanks. At most one short, warm reply with no new claims, offers or guarantees.",
+  "kind": "fanpage.reply_comment",
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-praise-1",
+        "message": "Dùng StockSync được 2 tháng rồi, hết cảnh bán lố luôn. Cảm ơn team nhiều nha!",
+        "from": {
+          "id": "u-thao",
+          "name": "Thảo Vũ"
+        }
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_reply",
+      "max": 1
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 0
+    },
+    {
+      "type": "draft.maxWords",
+      "max": 45
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "cam kết|đảm bảo|giảm giá|khuyến mãi|miễn phí"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

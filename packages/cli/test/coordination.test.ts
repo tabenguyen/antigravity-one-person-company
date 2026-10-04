@@ -84,6 +84,20 @@ describe("hq kpis / briefings", () => {
     expect(out.join("\n")).toContain("# Bản tin");
   });
 
+  it("kpiRows lists the Fanpage Manager numbers when the daemon reports them", () => {
+    const fanpage = { agents: 1, postsDrafted: 3, postsScheduled: 2, commentsReceived: 14, repliesDrafted: 9, repliesSent: 7, hideProposals: 2, escalations: 1, handoffs: 1 };
+    const rows = kpiRows({ ...report, roles: { ...report.roles, "fanpage-manager": fanpage } } as never);
+    const val = (metric: string) => rows.find((r) => r.role === "fanpage-manager" && r.metric === metric)!.value;
+    expect(val("commentsReceived")).toBe("14");
+    expect(val("postsScheduled")).toBe("2");
+    expect(val("hideProposals")).toBe("2");
+  });
+
+  it("routine create accepts the Fanpage kinds", () => {
+    expect(parseRoutineCreateArgs(["--agent", "fp-01", "--kind", "comment_poll", "--name", "n", "--schedule", "*/10 * * * *"]).body.kind).toBe("comment_poll");
+    expect(parseRoutineCreateArgs(["--agent", "fp-01", "--kind", "content_calendar", "--name", "n", "--schedule", "0 8 * * 1", "--config", '{"postsPerWeek":4}']).body.config).toEqual({ postsPerWeek: 4 });
+  });
+
   it("routine create accepts the new kinds", () => {
     expect(parseRoutineCreateArgs(["--agent", "am-01", "--kind", "account_review", "--name", "n", "--schedule", "0 9 * * 1"]).body.kind).toBe("account_review");
     expect(parseRoutineCreateArgs(["--agent", "cos-01", "--kind", "daily_digest", "--name", "n", "--schedule", "0 8 * * *", "--config", '{"lookbackHours":12}']).body.config).toEqual({ lookbackHours: 12 });

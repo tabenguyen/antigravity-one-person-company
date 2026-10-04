@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: "/agents", label: "Agents" },
   { to: "/contacts", label: "Contacts" },
   { to: "/inbound", label: "Inbound" },
+  { to: "/facebook", label: "Facebook" },
   { to: "/knowledge", label: "Knowledge" },
   { to: "/memory", label: "Memory" },
   { to: "/shadow", label: "Shadow run" },

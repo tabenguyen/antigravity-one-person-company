@@ -1,0 +1,50 @@
+{
+  "id": "comment-duplicate-one-task-one-draft",
+  "description": "The same comment is delivered three times in one poll (the same Facebook comment id). It is one stored comment, one task and one draft, never three. The question is answerable from the knowledge base (TikTok Shop is supported).",
+  "kind": "fanpage.reply_comment",
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-dup-1",
+        "message": "Phần mềm có kết nối được với TikTok Shop không ad?",
+        "from": {
+          "id": "u-lan",
+          "name": "Lan Nguyễn"
+        },
+        "repeat": 3
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "task.total",
+      "kind": "fanpage.reply_comment",
+      "equals": 1
+    },
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_reply",
+      "equals": 1
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 0
+    },
+    {
+      "type": "draft.contains",
+      "pattern": "tiktok"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

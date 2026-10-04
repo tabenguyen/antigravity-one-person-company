@@ -174,6 +174,36 @@ export const McpTools = {
       threadKey: z.string().optional(),
     }),
   },
+  fb_draft_post: {
+    description:
+      "Draft a Facebook Page post. It is NOT published: it goes to the outbox where a human approves it, and an approved post is only ever SCHEDULED (never posted immediately), so the human can still cancel it in Meta Business Suite. 'news' posts must carry the source URL you were given (sourceUrl) and quote it in the message. Facts and numbers must come from kb_search. Call it ONCE per task; only a refusal (\"Draft NOT created\") means you should fix the draft and call again.",
+    input: z.object({
+      postType: z.enum(["news", "feature", "release", "tip", "other"]),
+      message: z.string().min(1).max(5000),
+      link: z.string().url().max(2000).optional(),
+      sourceUrl: z.string().url().max(2000).optional(),
+      /** ISO 8601 time you propose it goes live; the daemon never schedules earlier than now + the configured lead time. */
+      publishAt: z.string().datetime({ offset: true }).optional(),
+      reason: z.string().min(1).max(500),
+    }),
+  },
+  fb_draft_reply: {
+    description:
+      "Draft a public reply to a Facebook comment (commentId from the task input). It is NOT posted: a human approves it first. Call it ONCE per comment. Do not use it for spam (use fb_propose_hide) and never for complaints, refunds or prices you cannot source.",
+    input: z.object({
+      commentId: z.string().min(1).max(200),
+      message: z.string().min(1).max(2000),
+      reason: z.string().min(1).max(500),
+    }),
+  },
+  fb_propose_hide: {
+    description:
+      "Propose hiding a Facebook comment (spam, scams, abuse). It is NOT hidden: a human approves it first. Call it ONCE per comment, and do not also reply to a comment you propose to hide.",
+    input: z.object({
+      commentId: z.string().min(1).max(200),
+      reason: z.string().min(1).max(500),
+    }),
+  },
 } as const;
 
 export type McpToolName = keyof typeof McpTools;
@@ -201,6 +231,16 @@ export interface McpToolOutputs {
     /** Plain-language account of what happened and what to do next; shown to the agent. */
     message: string;
   };
+  fb_draft_post: FbDraftOutput;
+  fb_draft_reply: FbDraftOutput;
+  fb_propose_hide: FbDraftOutput;
+}
+
+/** Result of a Facebook draft tool (same shape and semantics as outbox_draft_email). */
+export interface FbDraftOutput {
+  item: OutboxItem;
+  outcome: "created" | "updated";
+  message: string;
 }
 
 export const mcpRoute = (tool: McpToolName) => `/v1/mcp/${tool}`;
