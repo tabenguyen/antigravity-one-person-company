@@ -69,6 +69,37 @@ describe("ReadinessMonitor", () => {
     expect(events).toEqual(expect.arrayContaining(["settings.changed", "status.changed", "outbound.auto_paused"]));
   });
 
+  it("pauses only the agents whose role KB has placeholders, leaves outbound and other roles alone, and re-pauses on resume", async () => {
+    const { db, events, monitor, enable } = setup([check("kb.no_placeholders", "pass")]);
+    const policy = { builtins: [], mcp: [] };
+    db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "SDR", model: "m", workspacePath: "/tmp/sdr-01", policy });
+    db.agents.create({ id: "fanpage-01", role: "fanpage-manager", displayName: "FB", model: "m", workspacePath: "/tmp/fb-01", policy });
+    db.kb.upsertDocument({ scope: "role:fanpage-manager", title: "Voice", sourcePath: "/t/fanpage-manager/kb/page-voice.md", body: "# Voice\n\n> TODO: owner fills in" });
+    // Outbound off: nothing can leave, so the agent may keep drafting.
+    await monitor.check();
+    expect(db.agents.get("fanpage-01")!.status).toBe("active");
+
+    enable();
+
+    const res = await monitor.check();
+    expect(res.paused).toBe(false);
+    expect(db.settings.get().outboundEnabled).toBe(true);
+    expect(db.agents.get("fanpage-01")!.status).toBe("paused");
+    expect(db.agents.get("sdr-01")!.status).toBe("active");
+    const audit = db.audit.list({}).find((a) => a.kind === "agent.auto_paused")!;
+    expect(audit.agentId).toBe("fanpage-01");
+    expect(events).toContain("agent.updated");
+
+    db.agents.setStatus("fanpage-01", "active");
+    await monitor.check();
+    expect(db.agents.get("fanpage-01")!.status).toBe("paused");
+
+    db.kb.upsertDocument({ scope: "role:fanpage-manager", title: "Voice", sourcePath: "/t/fanpage-manager/kb/page-voice.md", body: "# Voice\n\nThân thiện, xưng \"Natsuko\"." });
+    db.agents.setStatus("fanpage-01", "active");
+    await monitor.check();
+    expect(db.agents.get("fanpage-01")!.status).toBe("active");
+  });
+
   it("respects failures acknowledged by a forced enable, but pauses on a new failure", async () => {
     const { db, monitor, enable, setChecks } = setup([check("company.profile")]);
     enable(["company.profile"]);

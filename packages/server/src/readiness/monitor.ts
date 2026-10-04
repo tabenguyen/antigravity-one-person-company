@@ -15,7 +15,7 @@ import type { ReadinessCheck, ReadinessReport } from "@agyhq/core";
 import type { Db } from "@agyhq/db";
 import type { AgyhqConfig } from "../config.ts";
 import type { EventBus } from "../event-bus.ts";
-import { computeReadiness, failingChecks, type VerifyResult } from "./checks.ts";
+import { computeReadiness, failingChecks, roleKbPlaceholders, type VerifyResult } from "./checks.ts";
 
 export const READINESS_ACK_KEY = "readiness_ack";
 const TRANSIENT_CHECKS = new Set(["email.verified"]);
@@ -115,6 +115,8 @@ export class ReadinessMonitor {
       this.#transientStreak = 0;
       return { paused: false, blocking: [], report };
     }
+    // Like the outbound pause: while nothing can leave, agents may keep drafting from an unfinished KB.
+    this.#pauseAgentsWithPlaceholderKb();
 
     const unacknowledged = failing.filter((f) => !stillAcknowledged.includes(f.id));
     const transientFailing = unacknowledged.some((f) => TRANSIENT_CHECKS.has(f.id));
@@ -127,6 +129,26 @@ export class ReadinessMonitor {
     this.#pause(blocking);
     this.#transientStreak = 0;
     return { paused: true, blocking, report };
+  }
+
+  /** While outbound is on, a role's unfinished KB stops only that role's agents, not all outbound. */
+  #pauseAgentsWithPlaceholderKb(): void {
+    const { db, bus } = this.#deps;
+    const byRole = roleKbPlaceholders(db);
+    if (byRole.size === 0) return;
+    for (const agent of db.agents.list({ status: "active" })) {
+      const files = byRole.get(agent.role);
+      if (!files) continue;
+      db.agents.setStatus(agent.id, "paused");
+      db.audit.append({
+        kind: "agent.auto_paused",
+        agentId: agent.id,
+        taskId: null,
+        conversationId: null,
+        data: { reason: "role knowledge base has placeholder text", files },
+      });
+      bus.emit("agent.updated", { agentId: agent.id, patch: { status: "paused" } });
+    }
   }
 
   #pause(blocking: ReadinessCheck[]): void {

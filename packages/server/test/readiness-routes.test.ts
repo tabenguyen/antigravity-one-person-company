@@ -164,28 +164,31 @@ describe("company profile routes", () => {
     // The shipped template KB is still full of EXAMPLE/TODO text: once an SDR works from it, readiness must refuse it.
     env.db.agents.create({ id: "sdr-01", role: "sales-sdr", displayName: "SDR", model: "m", workspacePath: "/tmp/sdr-01", policy: { builtins: [], mcp: [] } });
     const { body } = await env.call("GET", "/v1/admin/readiness");
-    const kb = (body.data.readiness as ReadinessReport).checks.find((c) => c.id === "kb.no_placeholders")!;
-    expect(kb.status).toBe("fail");
-    expect(kb.detail).toMatch(/role:sales-sdr\/icp\.md/);
+    const kb = (body.data.readiness as ReadinessReport).checks.find((c) => c.id === "kb.role_placeholders")!;
+    expect(kb.status).toBe("warn");
+    expect(kb.detail).toMatch(/sales-sdr \(.*icp\.md line 3/);
   });
 
-  it("scans only the role KBs of roles that have an active agent", async () => {
+  it("scans only the role KBs of roles that have an agent, and never fails readiness for them", async () => {
     const env = build({ useRepoTemplates: true });
-    const kbStatus = async () => {
+    const roleCheck = async () => {
       const { body } = await env.call("GET", "/v1/admin/readiness");
-      return (body.data.readiness as ReadinessReport).checks.find((c) => c.id === "kb.no_placeholders")!;
+      return (body.data.readiness as ReadinessReport).checks.find((c) => c.id === "kb.role_placeholders")!;
     };
     env.db.kb.upsertDocument({ scope: "role:account-manager", title: "Playbook", sourcePath: "/tmp/am/playbook.md", body: "# Playbook\nTODO: fill in the real refund policy." });
     // Nobody runs the account-manager role yet: its starter KB may keep TODO sections.
-    expect((await kbStatus()).status).toBe("pass");
+    expect((await roleCheck()).status).toBe("pass");
 
     env.db.agents.create({ id: "am-01", role: "account-manager", displayName: "AM", model: "m", workspacePath: "/tmp/am-01", policy: { builtins: [], mcp: [] } });
-    const active = await kbStatus();
-    expect(active.status).toBe("fail");
-    expect(active.detail).toMatch(/role:account-manager\/playbook\.md/);
+    const staffed = await roleCheck();
+    expect(staffed.status).toBe("warn");
+    expect(staffed.detail).toMatch(/account-manager \(playbook\.md/);
 
+    // Still reported while the agent is paused (it is waiting for that KB); archived agents don't count.
     env.db.agents.setStatus("am-01", "paused");
-    expect((await kbStatus()).status).toBe("pass");
+    expect((await roleCheck()).status).toBe("warn");
+    env.db.agents.setStatus("am-01", "archived");
+    expect((await roleCheck()).status).toBe("pass");
   });
 
   it("a saved profile's name is applied to config when the API is created", async () => {
