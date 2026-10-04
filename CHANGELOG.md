@@ -8,6 +8,11 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
+Adds the Fanpage Manager role and Facebook channel. Upgrading from 0.2.0 needs no manual
+steps: database migration 8 runs on daemon start. Run `npm run build` before restarting the daemon.
+
 ### Added
 
 - `hq` loads secrets from `<repoRoot>/.env` (gitignored; template `.env.example`; `AGYHQ_ENV_FILE` for another path) without overriding variables already set in the shell. `hq serve` logs the names it loaded, never values, and warns when the file is readable by other users.
@@ -21,6 +26,7 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 - Quota throttle is per model family. A drained Gemini bucket only holds back low-priority work of agents on Gemini models; agents on Claude/GPT models keep running on their own bucket (`QuotaMonitor.isThrottledFor(model)`, `tasks.claimNext(now, { skip })`). Unknown model ids still throttle when any bucket is low. Also fixes the throttled claim loop, which could claim low-priority tasks once any high-priority task was queued.
 - Readiness: placeholder text in a **role's** knowledge base no longer pauses all outbound. `kb.no_placeholders` now covers the company KB only; the new `kb.role_placeholders` check warns, and while outbound is on the readiness monitor pauses just that role's agents (re-pausing them if resumed early, audit `agent.auto_paused`). Before, filling in nothing for a new role (e.g. the Fanpage Manager) stopped the SDR's email too.
+- Web UI: sidebar navigation is grouped by function.
 - docs: README demo screenshots for the v0.2.0 features (SDR → Account Manager hand-off, KPIs by role, Chief of Staff briefing, shadow run); `npm run demo:screenshots` now produces 7 images.
 
 ## [0.2.0] - 2026-10-03
@@ -149,6 +155,7 @@ Tested with `agy` 1.2.14 on Node 20.
 - Real IMAP/SMTP has been tested against few providers.
 - Throughput is bounded by your Antigravity account quota.
 
-[Unreleased]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tabenguyen/antigravity-one-person-company/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tabenguyen/antigravity-one-person-company/releases/tag/v0.1.0
