@@ -253,6 +253,16 @@ Contract and definitions: [`docs/PHASE4.md`](PHASE4.md). Summary of what the dae
 - **CLI**: `hq kpis [--days n]`, `hq briefings [list|show <id>]`,
   `hq contact handoff <id> [--summary ...]`, `hq routine create --kind account_review|daily_digest`.
 
+## Fanpage Manager (Facebook Page)
+
+Contract, safety model and the open Meta questions: [`docs/FANPAGE.md`](FANPAGE.md); Meta app setup and the test ladder: [`docs/FANPAGE-RESEARCH.md`](FANPAGE-RESEARCH.md). In short:
+
+- **Config** (`agyhq.config.json` -> `facebook`): `kind` `graph` (real) / `fake` (in memory, offline) / `none` (default), `pageId`, `appId`, `apiVersion`, `tokenEnv` (the NAME of the env var holding the token, default `AGYHQ_FB_PAGE_TOKEN`; the token is only ever sent in the `Authorization: Bearer` header; the file cannot hold a token or secret), optional env `AGYHQ_FB_APP_SECRET` (when set every Graph call carries `appsecret_proof`), `pollIntervalMs`, `scheduleLeadHours`, `lookbackDays`, optional `appMode`.
+- **Pieces**: `@agyhq/channels` (`GraphApiFacebookProvider`, `FakeFacebookProvider`, `createFacebookProvider`, typed `FacebookError`), `packages/server/src/facebook/` (`FacebookPoller`, `intake.ts`, `FacebookSender`, `doctor.ts`, `runtime.ts`), MCP tools `fb_draft_post` / `fb_draft_reply` / `fb_propose_hide` (`agent-api/fb-draft.ts`), `quality/fanpage-lint.ts`, admin routes `admin-facebook.ts`, tables `fb_posts` / `fb_comments` / `fb_replies` (+ `outbox.payload`, migration 8).
+- **Outbox**: new channels `facebook_post` / `facebook_reply` / `facebook_hide` go through the same approval queue, kill switch, quiet hours (replies and hides only), rate limit, lint and shadow tier as email. The email Sender claims only `email`; the FacebookSender only `facebook_*`.
+- **Duplicates**: the Facebook comment id is the primary key of `fb_comments` and `task_id` is unique, so a comment seen on every poll gets one task; the draft tools refuse a second live draft for the same comment (`fb:comment:<id>` / `fb:hide:<id>`).
+- **CLI**: `hq facebook doctor [--local|--daemon]`. Evals: `hq eval run --suite fanpage-manager` (real agy) or `AGYHQ_REAL_AGY=1 AGYHQ_EVAL_SUITE=fanpage-manager npx vitest run packages/server/test/real-evals.test.ts`.
+
 ## Lint: only the agent's own words
 
 `outbox_draft_email` lints every draft (`quality/lint.ts`, AM promise rules in `quality/am-lint.ts`); `error` findings
@@ -408,7 +418,7 @@ Opt-in real run (uses a temp data dir, costs quota):
 | `@agyhq/runner` | Spawns `agy` headlessly and classifies the outcome |
 | `@agyhq/workspace` | Renders a role template into a per-agent workspace; renders per-task prompts |
 | `@agyhq/hooks` | The `PreToolUse`/`PostToolUse`/`PreInvocation`/`PostInvocation`/`Stop` scripts `agy` invokes |
-| `@agyhq/mcp` | The company MCP server (`kb_*`, `crm_*`, `memory_*`, `task_create`, `contact_handoff`, `outbox_draft_email`) |
+| `@agyhq/mcp` | The company MCP server (`kb_*`, `crm_*`, `memory_*`, `task_create`, `contact_handoff`, `outbox_draft_email`, `fb_draft_post`, `fb_draft_reply`, `fb_propose_hide`) |
 | `@agyhq/server` | The daemon: config, provisioning, KB ingestion, orchestrator, quota, inbound pipeline, sender, admin API, agent-facing API |
 | `@agyhq/channels` | Email providers (`imap-smtp`, `maildir`, `fake`) + parsing/classification, behind `@agyhq/core`'s `EmailProvider` contract |
 | `@agyhq/cli` | `hq` — the command-line client for the admin API |

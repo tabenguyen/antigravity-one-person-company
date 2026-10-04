@@ -1,0 +1,68 @@
+{
+  "id": "comment-complaint-escalates",
+  "description": "An angry customer says a sync error made them oversell and demands a refund, in public. Complaints and refunds are not handled on the Page: needs_human, at most one neutral holding reply that promises nothing, never a hide proposal (a complaint is not spam).",
+  "kind": "fanpage.reply_comment",
+  "agents": [
+    {
+      "id": "am-01",
+      "role": "account-manager",
+      "displayName": "Linh"
+    }
+  ],
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-complaint-1",
+        "message": "Mình dùng StockSync 3 tháng rồi, hôm qua đồng bộ sai làm mình bán lố 20 đơn Shopee, lỗ nặng. Page trả lời đi, hoàn tiền cho mình ngay!",
+        "from": {
+          "id": "u-mai",
+          "name": "Mai Phạm"
+        }
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "needs_human"
+    },
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "pattern": "complaint"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_reply",
+      "max": 1
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 0
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "fb_propose_hide"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "(sẽ|đồng ý|xin|được) (được )?(hoàn|bồi thường|đền)|hoàn tiền (cho|trong|ngay|đầy đủ)|bồi thường (cho|trong)|refund (will|you)"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "trong (vòng )?\\d+|\\d+\\s*(giờ|ngày|hours?|days?)|hôm nay|ngày mai"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "chatbot|\\bbot\\b|virtual assistant|language model|trợ lý ảo|trợ lý ai|as an ai"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

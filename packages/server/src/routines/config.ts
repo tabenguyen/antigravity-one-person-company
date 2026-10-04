@@ -54,6 +54,28 @@ export const DailyDigestConfigZ = z
   .strict();
 export type DailyDigestConfig = z.infer<typeof DailyDigestConfigZ>;
 
+/** Post types a calendar may plan on its own: `news` is never planned (it needs a human-supplied source URL). */
+export const CALENDAR_POST_TYPES = ["feature", "release", "tip", "other"] as const;
+
+export const ContentCalendarConfigZ = z
+  .object({
+    /** Posts to plan for the window. */
+    postsPerWeek: z.number().int().min(1).max(14).default(3),
+    postTypes: z.array(z.enum(CALENDAR_POST_TYPES)).min(1).default(["feature", "tip", "release"]),
+    /** Length of the planning window in days. */
+    daysAhead: z.number().int().min(1).max(30).default(7),
+  })
+  .strict();
+export type ContentCalendarConfig = z.infer<typeof ContentCalendarConfigZ>;
+
+export const CommentPollConfigZ = z
+  .object({
+    /** Most stored comments turned into reply tasks per run. */
+    maxPerRun: z.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+export type CommentPollConfig = z.infer<typeof CommentPollConfigZ>;
+
 export const CustomTaskConfigZ = z
   .object({
     kind: z.string().min(1).max(100),
@@ -74,6 +96,8 @@ const ROUTINE_CONFIG_SCHEMAS: Record<RoutineKind, z.ZodTypeAny> = {
   pipeline_review: PipelineReviewConfigZ,
   account_review: AccountReviewConfigZ,
   daily_digest: DailyDigestConfigZ,
+  content_calendar: ContentCalendarConfigZ,
+  comment_poll: CommentPollConfigZ,
   custom_task: CustomTaskConfigZ,
 };
 
@@ -82,6 +106,8 @@ export const ROUTINE_TASK_KIND: Partial<Record<RoutineKind, string>> = {
   pipeline_review: "sdr.pipeline_review",
   account_review: "am.account_review",
   daily_digest: "cos.daily_digest",
+  content_calendar: "fanpage.content_calendar",
+  comment_poll: "fanpage.reply_comment",
 };
 
 /** Validate + normalize (apply defaults to) a routine's config; throws ValidationError with a readable message. */

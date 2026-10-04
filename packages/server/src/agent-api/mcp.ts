@@ -16,6 +16,7 @@ import { readJsonBody } from "./body.ts";
 import type { ResolvedDeps } from "./deps.ts";
 import { handoffContact } from "../handoff.ts";
 import { draftEmail } from "./outbox-draft.ts";
+import { draftFbPost, draftFbReply, proposeFbHide } from "./fb-draft.ts";
 
 const SYSTEM_MANAGED_STAGES = new Set(["contacted", "replied"]);
 
@@ -150,6 +151,9 @@ export function registerMcpRoutes(app: Hono, deps: ResolvedDeps): void {
   });
 
   registerTool(app, deps, "outbox_draft_email", async (ctx, input) => draftEmail(ctx, input));
+  registerTool(app, deps, "fb_draft_post", async (ctx, input) => draftFbPost(ctx, input));
+  registerTool(app, deps, "fb_draft_reply", async (ctx, input) => draftFbReply(ctx, input));
+  registerTool(app, deps, "fb_propose_hide", async (ctx, input) => proposeFbHide(ctx, input));
 }
 
 interface ToolCtx {

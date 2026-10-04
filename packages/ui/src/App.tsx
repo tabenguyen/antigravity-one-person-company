@@ -18,6 +18,7 @@ import { ScorecardsPage } from "./pages/Scorecards/ScorecardsPage.tsx";
 import { BriefingsPage } from "./pages/Briefings/BriefingsPage.tsx";
 import { RoutinesPage } from "./pages/Routines/RoutinesPage.tsx";
 import { ShadowPage } from "./pages/Shadow/ShadowPage.tsx";
+import { FacebookPage } from "./pages/Facebook/FacebookPage.tsx";
 
 export function App() {
   const { authenticated, checking } = useAuth();
@@ -44,6 +45,7 @@ export function App() {
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/contacts/:id" element={<ContactDetailPage />} />
         <Route path="/inbound" element={<InboundPage />} />
+        <Route path="/facebook" element={<FacebookPage />} />
         <Route path="/knowledge" element={<KnowledgePage />} />
         <Route path="/memory" element={<MemoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />

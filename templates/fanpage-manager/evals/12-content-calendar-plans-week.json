@@ -1,0 +1,48 @@
+{
+  "id": "content-calendar-plans-week",
+  "description": "The weekly content calendar run. It plans up to three posts as fanpage.draft_post tasks (one per post, each a task a human will review) from what the knowledge base supports, and drafts no post itself.",
+  "kind": "fanpage.content_calendar",
+  "input": {
+    "routineName": "Lịch nội dung tuần",
+    "weekStart": "2026-10-05",
+    "weekEnd": "2026-10-12",
+    "postsPerWeek": 3,
+    "postTypes": [
+      "feature",
+      "release",
+      "tip"
+    ],
+    "scheduled": [],
+    "pendingDrafts": [],
+    "recent": []
+  },
+  "assertions": [
+    {
+      "type": "result.status",
+      "equals": "done"
+    },
+    {
+      "type": "task.created",
+      "kind": "fanpage.draft_post",
+      "min": 1,
+      "max": 3
+    },
+    {
+      "type": "tool.called",
+      "tool": "kb_search"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "fb_draft_post"
+    },
+    {
+      "type": "outbox.count",
+      "equals": 0
+    },
+    {
+      "type": "result.data.path",
+      "path": "planned",
+      "exists": true
+    }
+  ]
+}

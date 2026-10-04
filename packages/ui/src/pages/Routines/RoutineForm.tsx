@@ -20,6 +20,8 @@ export const KIND_LABELS: Record<RoutineKind, string> = {
   pipeline_review: "Pipeline review — flag stale leads, schedule follow-ups",
   account_review: "Account review — check customer accounts, flag at-risk ones, schedule check-ins",
   daily_digest: "Daily digest — write a briefing for the owner",
+  content_calendar: "Content calendar — plan the week's Facebook posts as drafts",
+  comment_poll: "Comment sweep — turn stored Facebook comments into reply tasks",
   custom_task: "Custom task — create a task each run",
 };
 
@@ -29,10 +31,12 @@ export const KIND_ROLE: Record<RoutineKind, AgentRole | null> = {
   pipeline_review: "sales-sdr",
   account_review: "account-manager",
   daily_digest: "chief-of-staff",
+  content_calendar: "fanpage-manager",
+  comment_poll: "fanpage-manager",
   custom_task: null,
 };
 
-const KIND_ORDER: RoutineKind[] = ["prospecting", "pipeline_review", "account_review", "daily_digest", "custom_task"];
+const KIND_ORDER: RoutineKind[] = ["prospecting", "pipeline_review", "account_review", "daily_digest", "content_calendar", "comment_poll", "custom_task"];
 
 /** Agents that can run a routine of this kind (archived agents never). */
 export function eligibleAgents(agents: Agent[], kind: RoutineKind): Agent[] {
@@ -95,6 +99,9 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
   const [maxAccounts, setMaxAccounts] = useState(String(cfg["maxAccounts"] ?? 40));
   const [reviewStaleDays, setReviewStaleDays] = useState(String(cfg["staleAfterDays"] ?? 14));
   const [lookbackHours, setLookbackHours] = useState(String(cfg["lookbackHours"] ?? 24));
+  const [postsPerWeek, setPostsPerWeek] = useState(String(cfg["postsPerWeek"] ?? 3));
+  const [daysAhead, setDaysAhead] = useState(String(cfg["daysAhead"] ?? 7));
+  const [maxPerRun, setMaxPerRun] = useState(String(cfg["maxPerRun"] ?? 20));
   const [taskKind, setTaskKind] = useState(String(cfg["kind"] ?? "sdr.follow_up"));
   const [taskTitle, setTaskTitle] = useState(String(cfg["title"] ?? ""));
   const [taskInput, setTaskInput] = useState(JSON.stringify(cfg["input"] ?? {}, null, 2));
@@ -140,6 +147,18 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
       const h = Number(lookbackHours);
       if (!Number.isInteger(h) || h < 1 || h > 168) throw new Error("Look-back must be a whole number of hours from 1 to 168.");
       return { lookbackHours: h };
+    }
+    if (kind === "content_calendar") {
+      const n = Number(postsPerWeek);
+      if (!Number.isInteger(n) || n < 1 || n > 14) throw new Error("Posts per week must be a whole number from 1 to 14.");
+      const d = Number(daysAhead);
+      if (!Number.isInteger(d) || d < 1 || d > 30) throw new Error("Planning window must be a whole number of days from 1 to 30.");
+      return { postsPerWeek: n, daysAhead: d };
+    }
+    if (kind === "comment_poll") {
+      const n = Number(maxPerRun);
+      if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error("Max comments per run must be a whole number from 1 to 100.");
+      return { maxPerRun: n };
     }
     if (!taskKind.trim()) throw new Error("Task kind is required (e.g. sdr.follow_up).");
     if (!taskTitle.trim()) throw new Error("Task title is required.");
@@ -301,6 +320,33 @@ export function RoutineForm({ agents, routine, onClose, onSaved }: RoutineFormPr
               <label htmlFor="rt-lookback">Look-back window (hours, 1-168)</label>
               <input id="rt-lookback" type="number" min={1} max={168} value={lookbackHours} onChange={(e) => setLookbackHours(e.target.value)} />
               <span className="faint">The Chief of Staff summarizes this much recent activity into a briefing you can read on the Briefings page.</span>
+            </div>
+          )}
+
+          {kind === "content_calendar" && (
+            <div className="rt-form-grid">
+              <div className="field">
+                <label htmlFor="rt-posts-per-week">Posts to plan (1-14)</label>
+                <input id="rt-posts-per-week" type="number" min={1} max={14} value={postsPerWeek} onChange={(e) => setPostsPerWeek(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="rt-days-ahead">Planning window (days, 1-30)</label>
+                <input id="rt-days-ahead" type="number" min={1} max={30} value={daysAhead} onChange={(e) => setDaysAhead(e.target.value)} />
+              </div>
+              <span className="faint rt-wide">
+                Creates one draft_post task per planned post (features, releases, tips from the knowledge base); each draft still waits in the Inbox for your approval.
+                News posts are never planned automatically: they need an article URL you supply.
+              </span>
+            </div>
+          )}
+
+          {kind === "comment_poll" && (
+            <div className="field">
+              <label htmlFor="rt-max-per-run">Max comments per run (1-100)</label>
+              <input id="rt-max-per-run" type="number" min={1} max={100} value={maxPerRun} onChange={(e) => setMaxPerRun(e.target.value)} />
+              <span className="faint">
+                The daemon fetches new comments by itself; this sweep gives the chosen Fanpage Manager any stored comment that has no reply task yet.
+              </span>
             </div>
           )}
 

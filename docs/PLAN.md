@@ -188,7 +188,7 @@ Separate the layers; the LLM is never the source of truth.
 |---|---|---|
 | Sales SDR | lead research, personalized outreach, follow-ups, qualify, book meetings, CRM hygiene | cold email sending, discounts |
 | Account manager / CS | onboarding, answer customer questions from KB, renewals, upsell signals, tier-1 support | refunds, commitments, SLA promises |
-| Marketer | content calendar, blog/social/newsletter drafts, SEO briefs, campaign reports | publishing, ad spend |
+| Marketer (first slice: **Fanpage Manager**, [FANPAGE.md](FANPAGE.md)) | content calendar, blog/social/newsletter drafts, SEO briefs, campaign reports; Facebook Page posts and comment replies | publishing, ad spend |
 | Chief of Staff | triage, delegation, daily digest to the owner | none (internal only) |
 
 Rule: numbers (prices, discounts, renewal amounts) come from tools, never
@@ -225,9 +225,13 @@ from the model's head.
 - Shadow run as a first-class object (`hq shadow`, Shadow run page, digest section) and the human runbook: [SHADOW-RUN.md](SHADOW-RUN.md).
 - Real-mailbox readiness ✅ 2026-10-03: imap-smtp tested against real IMAP/SMTP protocol servers (hoodiecrow + smtp-server), read-only inbox access (EXAMINE / BODY.PEEK, never \\Seen), opt-in Sent-folder sync so agents see what the human replied, `hq email doctor` preflight: [EMAIL-SETUP.md](EMAIL-SETUP.md). Next: the human connects a real mailbox and starts the run.
 
-**Phase 4 — More roles + coordination** ✅ built 2026-10-03 — see [PHASE4.md](PHASE4.md): Account Manager + Chief of Staff roles, SDR→AM handoff, role-aware routing, account_review / daily_digest routines, briefings, per-role KPIs; real-agy evals AM 8/8, CoS 6/6 (SLA-bait case occasionally flaky). Marketer deferred (needs publishing channels).
+**Phase 4 — More roles + coordination** ✅ built 2026-10-03 — see [PHASE4.md](PHASE4.md): Account Manager + Chief of Staff roles, SDR→AM handoff, role-aware routing, account_review / daily_digest routines, briefings, per-role KPIs; real-agy evals AM 8/8, CoS 6/6 (SLA-bait case occasionally flaky). Marketer deferred (needs publishing channels) → first slice built 2026-10-04 as the Fanpage Manager, below.
 - Remaining roles, Chief-of-Staff triage, handoffs, recurring routines,
   per-role KPIs, evals.
+
+**Phase 4b — Fanpage Manager** ✅ built 2026-10-04 against the fake provider only — see [FANPAGE.md](FANPAGE.md) (contract, safety model, "Pending spike") and [FANPAGE-RESEARCH.md](FANPAGE-RESEARCH.md) (Meta app setup, test ladder L0–L4)
+- Facebook Page channel (`FacebookPageProvider`: Graph API over `fetch` + in-memory fake), comment poller (dedupe by comment id), `fanpage-manager` role (`draft_post`, `reply_comment`, `content_calendar`), `content_calendar` / `comment_poll` routines, `hq facebook doctor`, Facebook drafts in the Inbox, scheduled-posts page, evals.
+- Nothing reaches Facebook without approval; approved posts are only ever *scheduled* (>= 24h ahead). Meta app created and `hq facebook doctor` passes against a real Page 2026-10-04 (token, Page identity, `appsecret_proof`; app in development mode). Still open: the spike checks in FANPAGE.md, chiefly whether strangers' comments are readable before the app goes Live.
 
 **Phase 5 — Hardening**
 - Postgres, multi-tenant (several companies), packaging roles as agy plugins.

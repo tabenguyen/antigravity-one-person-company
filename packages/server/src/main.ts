@@ -13,6 +13,7 @@ import { buildApp } from "./app.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { Orchestrator } from "./orchestrator.ts";
 import type { QuotaMonitor } from "./quota.ts";
+import type { FacebookRuntime } from "./facebook/runtime.ts";
 import { abortAllEvals, failInterruptedEvalRuns } from "./evals/manager.ts";
 
 export interface DaemonHandle {
@@ -22,6 +23,7 @@ export interface DaemonHandle {
   bus: EventBus;
   orchestrator: Orchestrator;
   quota: QuotaMonitor;
+  facebook: FacebookRuntime;
   port: number;
   stop(): Promise<void>;
 }
@@ -32,7 +34,7 @@ export async function startDaemon(config: AgyhqConfig): Promise<DaemonHandle> {
   fs.mkdirSync(config.workspacesRoot, { recursive: true });
 
   const db = openDb(config.dbPath);
-  const { app, bus, orchestrator, quota, emailRuntime, setupJobs, sender, routineScheduler, readinessMonitor } = buildApp(config, db);
+  const { app, bus, orchestrator, quota, emailRuntime, setupJobs, sender, facebook, routineScheduler, readinessMonitor } = buildApp(config, db);
 
   // Templates (and company/role KB) may have changed since agents were
   // provisioned or since the daemon last ran — refresh both before the
@@ -69,6 +71,7 @@ export async function startDaemon(config: AgyhqConfig): Promise<DaemonHandle> {
   readinessMonitor.start();
   sender.start(); // also recovers any outbox item stuck "sending" from a prior crash
   emailRuntime.start();
+  facebook.start(); // no-op unless a Facebook provider is configured
   failInterruptedEvalRuns(db); // runs a previous process never finished can't resume
   routineScheduler.start();
 
@@ -79,12 +82,14 @@ export async function startDaemon(config: AgyhqConfig): Promise<DaemonHandle> {
     bus,
     orchestrator,
     quota,
+    facebook,
     port,
     async stop(): Promise<void> {
       routineScheduler.stop();
       await abortAllEvals(db);
       await setupJobs.abortAll();
       await emailRuntime.stop();
+      await facebook.stop();
       sender.stop();
       readinessMonitor.stop();
       quota.stop();

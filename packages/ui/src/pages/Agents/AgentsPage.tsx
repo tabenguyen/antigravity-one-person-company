@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import type { Agent, AgentRole, TrustTier } from "../../api/types.ts";
 import { CreateAgentForm } from "./CreateAgentForm.tsx";
 
-const ROLES: AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff"];
+const ROLES: AgentRole[] = ["sales-sdr", "account-manager", "chief-of-staff", "fanpage-manager"];
 const TIERS: TrustTier[] = ["shadow", "assisted", "autonomous"];
 
 export function AgentsPage() {

@@ -1,4 +1,5 @@
-// Opt-in baseline run of the shipped Sales SDR eval suite against the REAL `agy` CLI
+// Opt-in baseline run of a shipped eval suite (default Sales SDR; AGYHQ_EVAL_SUITE=account-manager|chief-of-staff|fanpage-manager)
+// against the REAL `agy` CLI
 // (AGYHQ_REAL_AGY=1). One model run per case (maxAttempts 1, cases run sequentially).
 // This test records results; it deliberately does NOT require every case to pass — the
 // point of the suite is to measure the template, and failures are findings.
@@ -7,6 +8,8 @@
 //
 // AGYHQ_EVAL_MODEL overrides the model (default gemini-3.8-flash-medium);
 // AGYHQ_EVAL_CASES="id1,id2" runs a subset; AGYHQ_EVAL_OUT=<file> writes the JSON results there.
+//
+//   AGYHQ_REAL_AGY=1 AGYHQ_EVAL_SUITE=fanpage-manager npx vitest run packages/server/test/real-evals.test.ts
 
 import { existsSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -21,6 +24,7 @@ const HOOKS_DIST = path.join(REPO_ROOT, "packages/hooks/dist/pre-tool-use.mjs");
 const MCP_DIST = path.join(REPO_ROOT, "packages/mcp/dist/company-mcp.mjs");
 
 const ENABLED = process.env.AGYHQ_REAL_AGY === "1";
+const SUITE = process.env.AGYHQ_EVAL_SUITE ?? "sales-sdr";
 const PREREQS_OK = ENABLED && existsSync(AGY_BIN) && existsSync(HOOKS_DIST) && existsSync(MCP_DIST);
 const run = PREREQS_OK ? describe : describe.skip;
 
@@ -29,18 +33,18 @@ if (ENABLED && !PREREQS_OK) {
   console.warn("[real-evals] AGYHQ_REAL_AGY=1 but agy or the hooks/mcp builds are missing — run `npm run build`. Skipping.");
 }
 
-run("real eval baseline: sales-sdr suite (opt-in, AGYHQ_REAL_AGY=1)", () => {
+run(`real eval baseline: ${SUITE} suite (opt-in, AGYHQ_REAL_AGY=1)`, () => {
   it(
     "runs every case once and records pass/fail per assertion",
     async () => {
       const config = makeTestConfig({ agyBin: AGY_BIN, runTimeoutMs: 420_000 });
       const model = process.env.AGYHQ_EVAL_MODEL ?? "gemini-3.8-flash-medium";
       const caseIds = process.env.AGYHQ_EVAL_CASES?.split(",").filter(Boolean);
-      const total = loadSuite(config.templatesRoot, "sales-sdr").cases.length;
+      const total = loadSuite(config.templatesRoot, SUITE).cases.length;
 
       const { results } = await runEvalCases({
         config,
-        suite: "sales-sdr",
+        suite: SUITE,
         model,
         caseIds,
         caseTimeoutMs: 450_000,

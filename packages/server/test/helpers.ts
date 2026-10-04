@@ -35,6 +35,7 @@ export function makeTestConfig(overrides: Partial<AgyhqConfig> = {}): AgyhqConfi
     outboxDailyLimit: 50,
     configPath: null,
     email: { kind: "none", pollIntervalMs: 60_000 },
+    facebook: { kind: "none", pollIntervalMs: 120_000, scheduleLeadHours: 24, lookbackDays: 14 },
     sender: { name: "Test Co", address: "sdr@test.example", companyAddressLine: "123 Test St, Test City" },
     unsubscribeMailto: "unsubscribe@test.example",
     webhooks: {},

@@ -11,6 +11,8 @@ import type { Agent, ContactView, OutboxItem, OutboxStatus, TimelineEntry } from
 import { qualityApi, REJECTION_CATEGORY_OPTIONS, type RejectionCategory } from "../../api/quality.ts";
 import { shadowApi } from "../../api/shadow.ts";
 import { LintBadge, LintFindings, RejectCategoryChips, RevisionBadge } from "../Scorecards/LintFindings.tsx";
+import { facebookApi, facebookLabel, isFacebookItem } from "../../api/facebook.ts";
+import { CommentCard, PostCard, fromLocalInput, toLocalInput } from "./FacebookPreview.tsx";
 
 const HISTORY_TABS: { key: OutboxStatus; label: string }[] = [
   { key: "pending_approval", label: "Pending" },
@@ -207,9 +209,9 @@ export function InboxPage() {
                   </span>
                   <span className="faint">{relativeAge(item.createdAt)}</span>
                 </div>
-                <div className="inbox-row-subject">{item.subject ?? "(no subject)"}</div>
+                <div className="inbox-row-subject">{isFacebookItem(item) ? facebookLabel(item) : (item.subject ?? "(no subject)")}</div>
                 <div className="inbox-row-meta">
-                  <span>{item.to}</span>
+                  <span>{isFacebookItem(item) ? `Facebook · ${item.body.slice(0, 60)}${item.body.length > 60 ? "…" : ""}` : item.to}</span>
                   {item.statusReason && <span className="faint">{item.statusReason}</span>}
                 </div>
               </button>
@@ -264,6 +266,13 @@ function InboxDetail({
   const { notify } = useToast();
   const [subject, setSubject] = useState(item.subject ?? "");
   const [body, setBody] = useState(item.body);
+  const isFb = isFacebookItem(item);
+  const fbPayload = item.payload;
+  const postPayload = fbPayload?.kind === "post" ? fbPayload : null;
+  const commentPayload = fbPayload && fbPayload.kind !== "post" ? fbPayload : null;
+  const [publishAt, setPublishAt] = useState(toLocalInput(postPayload?.publishAt));
+  // How far ahead an approved post is scheduled (config facebook.scheduleLeadHours); only asked for when a post is on screen.
+  const { data: fbStatus } = useApi(() => (postPayload ? facebookApi.status() : Promise.resolve(null)), [item.id]);
   const [saving, setSaving] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -273,7 +282,8 @@ function InboxDetail({
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
 
   const isPending = item.status === "pending_approval";
-  const dirty = isPending && (subject !== (item.subject ?? "") || body !== item.body);
+  const publishAtChanged = postPayload !== null && fromLocalInput(publishAt) !== (postPayload.publishAt ?? null);
+  const dirty = isPending && ((!isFb && subject !== (item.subject ?? "")) || body !== item.body || publishAtChanged);
   // Mirrors the server: lint errors (placeholders, ungrounded prices, ...) block approval.
   const blockingLint = (item.lint ?? []).filter((f) => f.severity === "error").length;
   const isShadow = agent?.trustTier === "shadow";
@@ -281,14 +291,16 @@ function InboxDetail({
   useEffect(() => {
     setSubject(item.subject ?? "");
     setBody(item.body);
+    setPublishAt(toLocalInput(item.payload?.kind === "post" ? item.payload.publishAt : null));
     setRejecting(false);
     setRejectReason("");
     setRejectCategory(null);
-  }, [item.id, item.subject, item.body]);
+  }, [item.id, item.subject, item.body, item.payload]);
 
   useEffect(() => {
     let cancelled = false;
     setContact(null);
+    if (item.channel !== "email") return; // a Facebook commenter has no contact record
     setTimeline([]);
     api
       .listContacts({ email: item.to, limit: 1 })
@@ -305,13 +317,19 @@ function InboxDetail({
     return () => {
       cancelled = true;
     };
-  }, [item.to]);
+  }, [item.to, item.channel]);
+
+  /** What the PATCH carries: email edits subject + body; a Facebook item edits its text and, for a post, the planned time. */
+  function editBody() {
+    if (!isFb) return { subject, body };
+    return { body, ...(publishAtChanged ? { publishAt: fromLocalInput(publishAt) } : {}) };
+  }
 
   async function save() {
     if (!dirty || saving) return;
     setSaving(true);
     try {
-      const { item: updated } = await api.editOutbox(item.id, { subject, body });
+      const { item: updated } = await api.editOutbox(item.id, editBody());
       onSaved(updated);
       notify("Draft saved.", "success");
     } catch (err) {
@@ -331,7 +349,7 @@ function InboxDetail({
     try {
       if (dirty) {
         // "Edited then approved" is one step: save the edit (recorded for the edit-rate) and approve the saved version.
-        const { item: saved } = await api.editOutbox(item.id, { subject, body });
+        const { item: saved } = await api.editOutbox(item.id, editBody());
         onSaved(saved);
         const stillBlocking = (saved.lint ?? []).filter((f) => f.severity === "error").length;
         if (stillBlocking > 0) {
@@ -340,7 +358,7 @@ function InboxDetail({
         }
       }
       await api.approveOutbox(item.id);
-      notify(isShadow ? "Recorded as a practice approval (not sent)." : "Approved.", "success");
+      notify(isShadow ? "Recorded as a practice approval (not sent)." : postPayload ? "Approved: it will be scheduled, not posted at once." : "Approved.", "success");
       onDecided(item.id);
     } catch (err) {
       notify(err instanceof ApiError ? err.message : String(err), "error");
@@ -388,7 +406,7 @@ function InboxDetail({
       )}
       {!outboundEnabled && isPending && (
         <div className="banner banner-warning" role="status">
-          Approved emails will queue until outbound is enabled.
+          Approved {isFb ? "Facebook items" : "emails"} will queue until outbound is enabled.
         </div>
       )}
       {item.status === "rejected" && item.decidedBy === "policy:superseded" && (
@@ -421,7 +439,7 @@ function InboxDetail({
       <div className="inbox-detail-header">
         <div>
           <h2>
-            {item.to}
+            {isFb ? facebookLabel(item) : item.to}
             {dirty && <span className="dirty-dot" title="Unsaved changes" />}
           </h2>
           <p className="muted">
@@ -465,22 +483,40 @@ function InboxDetail({
 
       <LintFindings findings={item.lint} />
 
+      {commentPayload && <CommentCard payload={commentPayload} />}
+      {postPayload && <PostCard payload={postPayload} body={body} leadHours={fbStatus?.status.scheduleLeadHours ?? null} />}
+
       {isPending ? (
         <>
-          <div className="field compose-field">
-            <label htmlFor="outbox-subject">Subject</label>
-            <input id="outbox-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          </div>
-          <div className="field compose-field">
-            <label htmlFor="outbox-body">Body</label>
-            <textarea id="outbox-body" value={body} onChange={(e) => setBody(e.target.value)} />
-          </div>
+          {!isFb && (
+            <div className="field compose-field">
+              <label htmlFor="outbox-subject">Subject</label>
+              <input id="outbox-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+            </div>
+          )}
+          {item.channel === "facebook_hide" ? (
+            <p className="fb-meta">
+              <strong>Proposed: hide this comment.</strong> Why: {item.body}
+            </p>
+          ) : (
+            <div className="field compose-field">
+              <label htmlFor="outbox-body">{item.channel === "facebook_reply" ? "Our public reply" : item.channel === "facebook_post" ? "Post text" : "Body"}</label>
+              <textarea id="outbox-body" value={body} onChange={(e) => setBody(e.target.value)} />
+            </div>
+          )}
+          {postPayload && (
+            <div className="field compose-field">
+              <label htmlFor="outbox-publish-at">Planned go-live (optional; never earlier than the scheduling lead time)</label>
+              <input id="outbox-publish-at" type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+            </div>
+          )}
           {item.editedByHuman && <p className="faint">Previously edited by a human.</p>}
         </>
       ) : (
         <>
-          <h3>{item.subject}</h3>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{item.body}</pre>
+          {!isFb && <h3>{item.subject}</h3>}
+          {item.channel !== "facebook_post" && isFb && <p className="fb-reply-label">{item.channel === "facebook_hide" ? "Why it was proposed" : "Our reply"}</p>}
+          {item.channel !== "facebook_post" || !postPayload ? <pre style={{ whiteSpace: "pre-wrap" }}>{item.body}</pre> : null}
           {item.decidedBy && (
             <p className="muted">
               Decided by {item.decidedBy} at {formatDateTime(item.decidedAt)}

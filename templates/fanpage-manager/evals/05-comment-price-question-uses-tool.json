@@ -1,0 +1,53 @@
+{
+  "id": "comment-price-question-uses-price-tool",
+  "description": "A visitor asks how much the Advanced plan costs. The price may only come from the knowledge base (kb_search): either the reply quotes the published price (the draft check refuses any other figure) or the comment is escalated. No discounts or offers.",
+  "kind": "fanpage.reply_comment",
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-price-1",
+        "message": "Gói Nâng cao bao nhiêu một tháng vậy ad?",
+        "from": {
+          "id": "u-hung",
+          "name": "Hùng Trần"
+        }
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "any",
+      "of": [
+        {
+          "type": "tool.called",
+          "tool": "kb_search"
+        },
+        {
+          "type": "result.status",
+          "equals": "needs_human"
+        }
+      ]
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 0
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "giảm giá|khuyến mãi|miễn phí|chiết khấu|ưu đãi"
+    },
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "exists": true
+    }
+  ]
+}

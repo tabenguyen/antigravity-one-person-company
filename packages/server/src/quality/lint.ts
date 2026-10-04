@@ -426,7 +426,7 @@ export function lintDraft(draft: LintDraft, ctx: LintContext = {}): LintFinding[
   const hasMeetingLink =
     (meetingLink ? body.toLowerCase().includes(meetingLink.toLowerCase().replace(/\/+$/, "")) : false) ||
     links.some((l) => MEETING_LINK.test(l));
-  if (ctx.role !== "chief-of-staff" && !/[?？]/.test(body) && !hasMeetingLink && !CTA_PHRASES.test(body)) {
+  if (ctx.role !== "chief-of-staff" && ctx.role !== "fanpage-manager" && !/[?？]/.test(body) && !hasMeetingLink && !CTA_PHRASES.test(body)) {
     add("no_cta", "warn", "No call to action: no question, meeting link or clear ask. Add one specific, low-friction next step.");
   }
   if (links.length > LINT_LIMITS.maxLinks) {

@@ -23,6 +23,7 @@ import { EvalRunsRepo } from "./repos/evalRuns.ts";
 import { BriefingsRepo } from "./repos/briefings.ts";
 import { ShadowRunsRepo } from "./repos/shadowRuns.ts";
 import { HumanSentRepo } from "./repos/humanSent.ts";
+import { FacebookRepo } from "./repos/facebook.ts";
 
 type SqliteDb = Database.Database;
 
@@ -47,6 +48,7 @@ export interface Db {
   briefings: BriefingsRepo;
   shadowRuns: ShadowRunsRepo;
   humanSent: HumanSentRepo;
+  facebook: FacebookRepo;
   /** Run fn inside a single SQLite transaction; its return value is passed through. */
   transaction<T>(fn: () => T): T;
   close(): void;
@@ -84,6 +86,7 @@ export function openDb(path: string | ":memory:"): Db {
     briefings: new BriefingsRepo(sqlite),
     shadowRuns: new ShadowRunsRepo(sqlite),
     humanSent: new HumanSentRepo(sqlite),
+    facebook: new FacebookRepo(sqlite),
     transaction<T>(fn: () => T): T {
       return sqlite.transaction(fn)();
     },

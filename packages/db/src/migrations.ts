@@ -411,6 +411,59 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    name: "facebook_fanpage",
+    up(db) {
+      // Fanpage Manager (docs/FANPAGE.md). outbox.payload carries the structured parts of a Facebook item (post type /
+      // link / planned time, or the comment being answered). fb_comments is the dedupe point: the Facebook comment id is
+      // the primary key, so a comment seen on every poll is one row, and task_id is unique so it gets at most one task.
+      // fb_replies is the reply mapping (our reply's comment id -> the comment it answers) that stops the poller from
+      // answering its own replies even when Facebook strips `from`. The poll cursor lives in channel_cursors ("facebook").
+      db.exec(`
+        ALTER TABLE outbox ADD COLUMN payload TEXT;
+
+        CREATE TABLE fb_posts (
+          id TEXT PRIMARY KEY,
+          message TEXT,
+          permalink_url TEXT,
+          created_time TEXT NOT NULL,
+          is_published INTEGER NOT NULL DEFAULT 1,
+          scheduled_publish_time TEXT,
+          source TEXT NOT NULL,
+          outbox_id TEXT,
+          seen_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_fb_posts_created ON fb_posts(created_time DESC);
+
+        CREATE TABLE fb_comments (
+          id TEXT PRIMARY KEY,
+          post_id TEXT NOT NULL,
+          parent_id TEXT,
+          message TEXT NOT NULL,
+          author_id TEXT,
+          author_name TEXT,
+          created_time TEXT NOT NULL,
+          status TEXT NOT NULL,
+          status_reason TEXT,
+          task_id TEXT,
+          agent_id TEXT,
+          ingested_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_fb_comments_status ON fb_comments(status, created_time);
+        CREATE INDEX idx_fb_comments_post ON fb_comments(post_id);
+        CREATE UNIQUE INDEX idx_fb_comments_task ON fb_comments(task_id) WHERE task_id IS NOT NULL;
+
+        CREATE TABLE fb_replies (
+          reply_id TEXT PRIMARY KEY,
+          comment_id TEXT NOT NULL,
+          outbox_id TEXT,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_fb_replies_comment ON fb_replies(comment_id);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: SqliteDb): void {

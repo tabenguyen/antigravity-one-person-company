@@ -4,7 +4,7 @@ import { useToast } from "../../components/Toast.tsx";
 import type { AgentRole } from "../../api/types.ts";
 import { ROLE_INFO } from "../../lib/roles.ts";
 
-const ID_HINT: Record<string, string> = { "sales-sdr": "sdr-02", "account-manager": "am-01", "chief-of-staff": "cos-01" };
+const ID_HINT: Record<string, string> = { "sales-sdr": "sdr-02", "account-manager": "am-01", "chief-of-staff": "cos-01", "fanpage-manager": "fp-01" };
 
 export function CreateAgentForm({ roles, onClose, onCreated }: { roles: AgentRole[]; onClose: () => void; onCreated: () => void }) {
   const { notify } = useToast();

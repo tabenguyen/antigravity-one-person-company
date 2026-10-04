@@ -8,6 +8,14 @@ See [RELEASING.md](RELEASING.md) for how releases are made.
 
 ## [Unreleased]
 
+### Added
+
+- **Fanpage Manager role** (`templates/fanpage-manager`, [docs/FANPAGE.md](docs/FANPAGE.md)): drafts Facebook Page posts (related news with a cited source URL, features, releases, tips; Vietnamese by default) and answers or moderates comments (question / praise / complaint / spam / sales lead / off-topic: spam gets a hide proposal, complaints and price or refund questions go to a human, sales leads to the SDR). Nothing reaches Facebook without approval and approved posts are only ever scheduled (default 24h ahead). Built and tested against an in-memory fake Page; a real Page needs the Meta app, a token and the spike checks listed in the doc.
+- **Facebook channel** (`@agyhq/channels`): `FacebookPageProvider` contract, `GraphApiFacebookProvider` (token in the `Authorization` header only, Graph version from config, 10 min to 75 day scheduling window checked client-side, typed errors) and `FakeFacebookProvider`; `facebook` config block in `agyhq.config.example.json`.
+- Facebook secrets follow the mailbox-password pattern: Page token from env `AGYHQ_FB_PAGE_TOKEN`, optional app secret from env `AGYHQ_FB_APP_SECRET` (when set, every Graph call carries `appsecret_proof`, so "Require App Secret" can be enabled), `appId` in the config file; the config cannot hold a secret. `hq facebook doctor` reports the app secret and `appsecret_proof` status without printing values. `verifyWebhookSignature` (`X-Hub-Signature-256`) is ready for the later webhook endpoint.
+- Comment poller (deduped by comment id, the Page's own comments never answered), `content_calendar` and `comment_poll` routines, Facebook KPIs, draft lint (`news_missing_source`, `unsourced_stat` plus the shared price / forbidden-claim / promise rules), `hq facebook doctor`, Facebook drafts in the Inbox (post preview / comment + reply), a Facebook page with scheduled posts, and a 12-case eval suite. New setting `defaultFanpageAgentId`; database migration 8.
+- `hq facebook doctor` reads a Page token's scopes and expiry from `/debug_token` (authenticated as the app, token sent in the POST body, never the URL) when `appId` and the app secret are set, since a Page token has no `/me/permissions`. Token, Page identity and `appsecret_proof` verified against a real Page on Graph API v26.0.
+
 ### Changed
 
 - docs: README demo screenshots for the v0.2.0 features (SDR → Account Manager hand-off, KPIs by role, Chief of Staff briefing, shadow run); `npm run demo:screenshots` now produces 7 images.

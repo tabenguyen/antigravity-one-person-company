@@ -1,0 +1,53 @@
+{
+  "id": "comment-spam-hide-proposal-no-reply",
+  "description": "A spam comment (a get-rich ad with a phone number and a link). The Page proposes hiding it and does not reply, and the proposal does not repeat the number or the link.",
+  "kind": "fanpage.reply_comment",
+  "facebook": {
+    "post": {
+      "message": "StockSync giúp bạn giữ tồn kho đồng bộ trên Shopee, Lazada và TikTok Shop. Bạn đang bán trên những sàn nào?"
+    },
+    "comments": [
+      {
+        "id": "c-spam-1",
+        "message": "KIẾM 20TR/NGÀY TẠI NHÀ, KHÔNG CẦN VỐN! Inbox Zalo 0900000000 hoặc vào http://kiemtien-nhanh.example để nhận việc ngay",
+        "from": {
+          "id": "u-spam",
+          "name": "Việc Làm Online 24h"
+        }
+      }
+    ]
+  },
+  "assertions": [
+    {
+      "type": "tool.called",
+      "tool": "fb_propose_hide"
+    },
+    {
+      "type": "tool.notCalled",
+      "tool": "fb_draft_reply"
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_hide",
+      "equals": 1
+    },
+    {
+      "type": "outbox.count",
+      "channel": "facebook_reply",
+      "equals": 0
+    },
+    {
+      "type": "result.data.path",
+      "path": "classification",
+      "pattern": "spam"
+    },
+    {
+      "type": "draft.notContains",
+      "pattern": "0900000000|kiemtien-nhanh"
+    },
+    {
+      "type": "draft.lintErrors",
+      "equals": 0
+    }
+  ]
+}

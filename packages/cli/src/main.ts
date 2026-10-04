@@ -29,13 +29,14 @@ import { cmdEval, cmdRoutine } from "./commands/routines.ts";
 import { cmdBriefings, cmdKpis } from "./commands/coordination.ts";
 import { cmdShadow } from "./commands/shadow.ts";
 import { cmdEmail } from "./commands/email.ts";
+import { cmdFacebook } from "./commands/facebook.ts";
 
 const HELP: Record<string, string> = {
   agent: [
     "usage: hq agent <subcommand> [args]",
     "",
     "subcommands:",
-    "  create <id> --role <sales-sdr|account-manager|chief-of-staff> --display-name <name> [--model <m>] [--trust-tier <t>] [--max-concurrency <n>]",
+    "  create <id> --role <sales-sdr|account-manager|chief-of-staff|fanpage-manager> --display-name <name> [--model <m>] [--trust-tier <t>] [--max-concurrency <n>]",
     "  list [--status <s>] [--role <r>]",
     "  show <id>",
     "  pause <id>",
@@ -842,6 +843,8 @@ async function main(): Promise<void> {
       return await cmdBriefings(commandArgs, global);
     case "email":
       return await cmdEmail(commandArgs, global);
+    case "facebook":
+      return await cmdFacebook(commandArgs, global);
     case "shadow":
       return await cmdShadow(commandArgs, global);
     case "--help":
@@ -873,6 +876,7 @@ async function main(): Promise<void> {
           "  briefings   list|show   (the Chief of Staff's daily digests)",
           "  shadow      start|status|end|list   (the 2-week shadow-run evaluation)",
           "  email       doctor   (read-only mailbox preflight; run before a shadow run)",
+          "  facebook    doctor   (read-only Facebook Page preflight: token, Page, permissions, app mode)",
           "  killswitch  on|off",
           "  status",
           "  quota",
