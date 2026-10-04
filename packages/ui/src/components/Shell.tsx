@@ -8,22 +8,54 @@ import { api } from "../api/client.ts";
 import { eventHub } from "../api/sse.ts";
 import { useToast } from "./Toast.tsx";
 
-const NAV_ITEMS = [
-  { to: "/inbox", label: "Inbox", badge: "pending" as const },
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/briefings", label: "Briefings" },
-  { to: "/tasks", label: "Tasks" },
-  { to: "/agents", label: "Agents" },
-  { to: "/contacts", label: "Contacts" },
-  { to: "/inbound", label: "Inbound" },
-  { to: "/facebook", label: "Facebook" },
-  { to: "/knowledge", label: "Knowledge" },
-  { to: "/memory", label: "Memory" },
-  { to: "/shadow", label: "Shadow run" },
-  { to: "/scorecards", label: "Scorecards" },
-  { to: "/routines", label: "Routines" },
-  { to: "/setup", label: "Setup" },
-  { to: "/settings", label: "Settings" },
+interface NavItem {
+  to: string;
+  label: string;
+  badge?: "pending";
+}
+
+// Grouped by function: what needs me now → who we talk to → the AI workforce → how it performs → configuration.
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "Công việc",
+    items: [
+      { to: "/inbox", label: "Inbox", badge: "pending" },
+      { to: "/tasks", label: "Tasks" },
+      { to: "/briefings", label: "Briefings" },
+    ],
+  },
+  {
+    title: "Khách hàng & Kênh",
+    items: [
+      { to: "/contacts", label: "Contacts" },
+      { to: "/inbound", label: "Inbound" },
+      { to: "/facebook", label: "Facebook" },
+    ],
+  },
+  {
+    title: "Đội ngũ AI",
+    items: [
+      { to: "/agents", label: "Agents" },
+      { to: "/routines", label: "Routines" },
+      { to: "/knowledge", label: "Knowledge" },
+      { to: "/memory", label: "Memory" },
+    ],
+  },
+  {
+    title: "Hiệu suất",
+    items: [
+      { to: "/dashboard", label: "Dashboard" },
+      { to: "/scorecards", label: "Scorecards" },
+      { to: "/shadow", label: "Shadow run" },
+    ],
+  },
+  {
+    title: "Hệ thống",
+    items: [
+      { to: "/setup", label: "Setup" },
+      { to: "/settings", label: "Settings" },
+    ],
+  },
 ];
 
 export function Shell() {
@@ -77,16 +109,21 @@ export function Shell() {
 
       <nav className={`nav ${navOpen ? "open" : ""}`}>
         <div className="nav-brand">agy-ui</div>
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-            onClick={() => setNavOpen(false)}
-          >
-            <span>{item.label}</span>
-            {item.badge === "pending" && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
-          </NavLink>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title} className="nav-group" role="group" aria-label={group.title}>
+            <div className="nav-group-title">{group.title}</div>
+            {group.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                onClick={() => setNavOpen(false)}
+              >
+                <span>{item.label}</span>
+                {item.badge === "pending" && pendingCount > 0 && <span className="nav-badge">{pendingCount}</span>}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
