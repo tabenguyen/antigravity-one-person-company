@@ -83,6 +83,7 @@ describe("computeReadiness", () => {
       "company.profile",
       "kb.company_present",
       "kb.no_placeholders",
+      "kb.role_placeholders",
       "sender.identity",
       "unsubscribe.mailto",
       "email.provider",
@@ -121,24 +122,27 @@ describe("computeReadiness", () => {
     expect(byId(await run(db, config), "company.profile").status).toBe("pass");
   });
 
-  it("kb.no_placeholders lists files and the first offending line, company and role scopes only", async () => {
+  it("kb.no_placeholders (company scope) fails and lists files; role placeholders only warn in kb.role_placeholders", async () => {
     const config = readyConfig();
     const db = openTestDb();
     seedReady(db, config);
     db.kb.upsertDocument({ scope: "role:sales-sdr", title: "ICP", sourcePath: "/t/sales-sdr/kb/icp.md", body: "# ICP\n\n> **EXAMPLE — replace this**\n- TODO — x" });
     db.kb.upsertDocument({ scope: "agent:sdr-01", title: "Notes", sourcePath: "/w/sdr-01/kb/n.md", body: "TODO scratch notes are fine here" });
-    const c = byId(await run(db, config), "kb.no_placeholders");
-    expect(c.status).toBe("fail");
-    expect(c.detail).toContain("role:sales-sdr/icp.md");
-    expect(c.detail).toContain("line 3");
-    expect(c.detail).toContain("EXAMPLE");
-    expect(c.detail).not.toContain("scratch");
-    expect(c.fixPath).toBe("/knowledge");
+    const report = await run(db, config);
+    expect(byId(report, "kb.no_placeholders").status).toBe("pass");
+    const role = byId(report, "kb.role_placeholders");
+    expect(role.status).toBe("warn");
+    expect(role.detail).toContain("sales-sdr (icp.md line 3");
+    expect(role.detail).toContain("EXAMPLE");
+    expect(role.detail).not.toContain("scratch");
+    expect(role.fixPath).toBe("/knowledge");
 
     db.kb.upsertDocument({ scope: "company", title: "Bad", sourcePath: `${config.kbRoot}/company/bad.md`, body: "Pricing: TBD" });
     const c2 = byId(await run(db, config), "kb.no_placeholders");
-    expect(c2.detail).toContain("2 knowledge base file(s)");
+    expect(c2.status).toBe("fail");
+    expect(c2.detail).toContain("1 knowledge base file(s)");
     expect(c2.detail).toContain("company/bad.md");
+    expect(c2.fixPath).toBe("/knowledge");
   });
 
   it("kb.no_placeholders passes Vietnamese content", async () => {

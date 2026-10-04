@@ -169,6 +169,10 @@ The same secret verifies webhook deliveries later (`verifyWebhookSignature`, hea
 `hq facebook doctor` shows `appId`, whether the app secret is set and whether `appsecret_proof` is being sent; it never prints a
 token or secret value.
 
+Instead of exporting them in the shell, the env vars can live in `<repoRoot>/.env` (gitignored, `chmod 600`; template
+`.env.example`). `hq` loads it at start (`AGYHQ_ENV_FILE` names another file), a variable already set in the shell wins,
+`hq serve` logs which names came from the file (never values), and a file readable by other users gets a warning.
+
 ## 10. CLI, API, UI
 
 - `hq facebook doctor [--local | --daemon]`: token valid, `/me` Page identity (matches `pageId`), the five permissions, app mode,

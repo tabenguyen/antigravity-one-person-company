@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { parseEnv } from "node:util";
 import { z } from "zod";
 import type { EmailProviderConfig, FacebookProviderConfig } from "@agyhq/channels";
 
@@ -32,6 +33,41 @@ function findRepoRoot(startDir: string): string {
     if (parent === dir) return startDir; // reached filesystem root; give up, use cwd
     dir = parent;
   }
+}
+
+// ---------------------------------------------------------------------------
+// .env (optional): secrets such as AGYHQ_FB_PAGE_TOKEN / AGYHQ_FB_APP_SECRET /
+// AGYHQ_IMAP_PASS can live in <repoRoot>/.env (gitignored) instead of the shell.
+// A variable already set in the environment always wins over the file.
+
+export interface DotEnvResult {
+  path: string;
+  /** Names (never values) of the variables taken from the file. */
+  loaded: string[];
+  /** Set when the file is readable by group/other: it holds secrets, it should be chmod 600. */
+  warning: string | null;
+}
+
+/** Load `AGYHQ_ENV_FILE` or `<repoRoot>/.env` into `env` without overriding existing variables. Null when there is no file. */
+export function loadDotEnv(opts: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): DotEnvResult | null {
+  const env = opts.env ?? process.env;
+  const file = env.AGYHQ_ENV_FILE ?? path.join(findRepoRoot(opts.cwd ?? process.cwd()), ".env");
+  let text: string;
+  let mode: number;
+  try {
+    text = fs.readFileSync(file, "utf8");
+    mode = fs.statSync(file).mode;
+  } catch {
+    return null;
+  }
+  const loaded: string[] = [];
+  for (const [name, value] of Object.entries(parseEnv(text))) {
+    if (env[name] !== undefined) continue;
+    env[name] = value;
+    loaded.push(name);
+  }
+  const warning = mode & 0o077 ? `${file} is readable by other users (mode ${(mode & 0o777).toString(8)}); run: chmod 600 ${file}` : null;
+  return { path: file, loaded, warning };
 }
 
 // ---------------------------------------------------------------------------

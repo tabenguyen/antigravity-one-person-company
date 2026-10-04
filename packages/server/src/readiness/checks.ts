@@ -67,27 +67,23 @@ function kbChecks(deps: ReadinessDeps): ReadinessCheck[] {
           "/setup#company",
         );
 
-  // A role's starter KB is only a risk once an agent of that role is working: roles nobody runs may keep TODO sections.
-  const activeRoles = new Set(db.agents.list({ status: "active" }).map((a) => `role:${a.role}`));
+  // Company KB placeholders reach every agent: they block all outbound. A role's KB placeholders only concern that role's
+  // agents, so they don't block outbound: the readiness monitor pauses those agents instead (see roleKbPlaceholders).
   const offenders: string[] = [];
   let offenderCount = 0;
   for (const doc of docs) {
-    if (doc.scope !== "company" && !activeRoles.has(doc.scope)) continue;
+    if (doc.scope !== "company") continue;
     const hit = findPlaceholder(doc.body);
     if (!hit) continue;
     offenderCount++;
     if (offenders.length < MAX_FILES_LISTED) {
-      const label =
-        doc.scope === "company"
-          ? path.relative(config.kbRoot, doc.sourcePath) || path.basename(doc.sourcePath)
-          : `${doc.scope}/${path.basename(doc.sourcePath)}`;
-      offenders.push(`${label} line ${hit.line} (${hit.marker}): "${hit.text}"`);
+      offenders.push(`${path.relative(config.kbRoot, doc.sourcePath) || path.basename(doc.sourcePath)} line ${hit.line} (${hit.marker}): "${hit.text}"`);
     }
   }
   const more = offenderCount > offenders.length ? ` …and ${offenderCount - offenders.length} more.` : "";
   const clean =
     offenderCount === 0
-      ? check("kb.no_placeholders", "Knowledge base has no placeholder text", "pass", "No example/TODO placeholder text found in company or role knowledge base.", "/knowledge")
+      ? check("kb.no_placeholders", "Knowledge base has no placeholder text", "pass", "No example/TODO placeholder text found in the company knowledge base.", "/knowledge")
       : check(
           "kb.no_placeholders",
           "Knowledge base has no placeholder text",
@@ -96,7 +92,46 @@ function kbChecks(deps: ReadinessDeps): ReadinessCheck[] {
           "/knowledge",
         );
 
-  return [present, clean];
+  const byRole = roleKbPlaceholders(db);
+  const roleClean =
+    byRole.size === 0
+      ? check("kb.role_placeholders", "Role knowledge base has no placeholder text", "pass", "No example/TODO placeholder text in the knowledge base of any role that has an agent.", "/knowledge")
+      : check(
+          "kb.role_placeholders",
+          "Role knowledge base has no placeholder text",
+          "warn",
+          `Agents of these roles are paused (and re-paused if resumed) until their knowledge base is filled in; other roles keep working: ${[...byRole]
+            .map(([role, files]) => `${role} (${files.join("; ")})`)
+            .join(" | ")}.`,
+          "/knowledge",
+        );
+
+  return [present, clean, roleClean];
+}
+
+/**
+ * Roles that have a non-archived agent and whose role KB still contains placeholder text, with the offending files
+ * (at most MAX_FILES_LISTED each). Roles nobody runs may keep their starter KB's TODO sections.
+ */
+export function roleKbPlaceholders(db: Db): Map<string, string[]> {
+  const staffed = new Set(
+    db.agents
+      .list()
+      .filter((a) => a.status !== "archived")
+      .map((a) => a.role as string),
+  );
+  const out = new Map<string, string[]>();
+  for (const doc of db.kb.listDocuments()) {
+    if (!doc.scope.startsWith("role:")) continue;
+    const role = doc.scope.slice("role:".length);
+    if (!staffed.has(role)) continue;
+    const hit = findPlaceholder(doc.body);
+    if (!hit) continue;
+    const files = out.get(role) ?? [];
+    if (files.length < MAX_FILES_LISTED) files.push(`${path.basename(doc.sourcePath)} line ${hit.line} (${hit.marker}): "${hit.text}"`);
+    out.set(role, files);
+  }
+  return out;
 }
 
 function senderChecks(config: AgyhqConfig, db: Db): ReadinessCheck[] {

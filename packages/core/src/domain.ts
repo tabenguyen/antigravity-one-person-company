@@ -456,6 +456,7 @@ export type AuditKind =
   | "setup.company_saved"
   | "killswitch.forced"
   | "outbound.auto_paused"
+  | "agent.auto_paused"
   | "routine.ran"
   | "eval.finished"
   | "contact.handoff"

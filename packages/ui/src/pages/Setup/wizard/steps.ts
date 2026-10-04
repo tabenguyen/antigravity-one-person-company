@@ -13,7 +13,7 @@ export interface StepDef {
 
 export const STEPS: StepDef[] = [
   { key: "company", label: "Công ty", checks: ["company.profile", "kb.company_present"] },
-  { key: "kb", label: "Kiến thức bán hàng", checks: ["kb.no_placeholders"] },
+  { key: "kb", label: "Kiến thức bán hàng", checks: ["kb.no_placeholders", "kb.role_placeholders"] },
   { key: "email", label: "Email", checks: ["email.provider", "email.verified"] },
   { key: "sender", label: "Người gửi", checks: ["sender.identity", "unsubscribe.mailto"] },
   { key: "agent", label: "Agent SDR", checks: ["agents.sdr_present", "settings.default_sdr"] },

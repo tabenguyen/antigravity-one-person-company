@@ -1,4 +1,4 @@
-export { loadConfig, assertBuildArtifacts, type AgyhqConfig, type LoadConfigOptions, type ConfigFile } from "./config.ts";
+export { loadConfig, loadDotEnv, assertBuildArtifacts, type AgyhqConfig, type LoadConfigOptions, type ConfigFile, type DotEnvResult } from "./config.ts";
 export { createAgent, rerender, rerenderAll, buildRenderVars, type ProvisionCtx, type CreateAgentArgs } from "./provision.ts";
 export { syncKb, syncOneFile, type KbIngestCtx, type KbSyncResult, type KbSyncSummary } from "./kb-ingest.ts";
 export { ingestEmail, ingestWebhookLead, EmailPoller, type InboundCtx } from "./inbound.ts";

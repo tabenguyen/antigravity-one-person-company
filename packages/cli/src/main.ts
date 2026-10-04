@@ -19,7 +19,7 @@ import type {
   TrustTier,
 } from "@agyhq/core";
 import { TERMINAL_TASK_STATUSES } from "@agyhq/core";
-import { loadConfig, startDaemon, type DaemonStatus } from "@agyhq/server";
+import { loadConfig, loadDotEnv, startDaemon, type DaemonStatus } from "@agyhq/server";
 import { HqApiError, HqClient, type ClientOptions } from "./client.ts";
 import { printJson, printKv, printTable } from "./format.ts";
 import { readSse } from "./sse.ts";
@@ -796,9 +796,13 @@ async function cmdServe(argv: string[], global: GlobalFlags): Promise<void> {
 // main
 
 async function main(): Promise<void> {
+  // Before anything reads process.env: secrets may come from <repoRoot>/.env (names are reported, never values).
+  const dotEnv = loadDotEnv();
+  if (dotEnv?.warning) console.error(`hq: warning: ${dotEnv.warning}`);
   const argv = process.argv.slice(2);
   const { global, rest } = splitGlobalFlags(argv);
   const [command, ...commandArgs] = rest;
+  if (dotEnv && dotEnv.loaded.length > 0 && command === "serve") console.log(`env: ${dotEnv.loaded.join(", ")} from ${dotEnv.path}`);
 
   switch (command) {
     case "serve":
