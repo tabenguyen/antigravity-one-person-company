@@ -123,6 +123,8 @@ Repo này được xây dựng và thử nghiệm cùng [NK Invoice](https://tra
 
 ## Bắt đầu trong ~15 phút
 
+Hướng dẫn cài đặt đầy đủ từng bước (cài dịch vụ, hồ sơ công ty, SDR với email SMTP/IMAP, Fanpage Facebook): [`docs/INSTALL.md`](docs/INSTALL.md).
+
 **Cần có**
 
 - Node 20+
