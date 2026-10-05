@@ -46,8 +46,8 @@ export function renderResearcherWorkspace(opts: ResearcherWorkspaceOptions): voi
     path.join(dir, "AGENTS.md"),
     `# Company researcher workspace
 
-This workspace exists for one job: read a company's public website and produce a structured company profile and a sales
-knowledge base for an AI Sales Development Representative. The user's request tells you which domain.
+This workspace exists for one job: read a company's public website and produce a structured company profile, a sales
+knowledge base for an AI Sales Development Representative and, when asked, a Facebook Page knowledge base for an AI Fanpage Manager. The user's request tells you which domain.
 
 ${STANDING_RULES}
 `,

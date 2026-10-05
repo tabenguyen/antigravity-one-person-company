@@ -123,6 +123,7 @@ interface World {
   jobs: any[];
   jobById: Record<string, any>;
   roleKb: { source: "override" | "template"; files: any[] };
+  fanpageKb: { source: "override" | "template"; files: any[] };
   email: any;
   sender: any;
   agents: any[];
@@ -142,6 +143,7 @@ function mount(initial: string, patch: Partial<World> = {}) {
     jobs: [],
     jobById: {},
     roleKb: { source: "template", files: [] },
+    fanpageKb: { source: "template", files: [] },
     email: EMAIL_NONE,
     sender: { name: "", address: "", companyAddressLine: "", unsubscribeMailto: "", source: "config" },
     agents: [],
@@ -179,12 +181,17 @@ function mount(initial: string, patch: Partial<World> = {}) {
       rec("cancel", true);
       return ok({ job: { ...runningJob(), status: "cancelled", finishedAt: new Date().toISOString() } });
     },
-    "GET /v1/admin/setup/role-kb": () => ok({ role: "sales-sdr", ...w.roleKb }),
+    "GET /v1/admin/setup/role-kb": (u) => {
+      const role = u.searchParams.get("role") ?? "sales-sdr";
+      return ok({ role, ...(role === "fanpage-manager" ? w.fanpageKb : w.roleKb) });
+    },
     "PUT /v1/admin/setup/role-kb": (_u, init) => {
       const b = body(init);
       rec("putKb", b);
-      w.roleKb = { source: "override", files: b.files.map((f: any) => ({ ...f, title: f.relPath, hasPlaceholders: false })) };
-      return ok({ role: "sales-sdr", ...w.roleKb });
+      const next = { source: "override" as const, files: b.files.map((f: any) => ({ ...f, title: f.relPath, hasPlaceholders: false })) };
+      if (b.role === "fanpage-manager") w.fanpageKb = next;
+      else w.roleKb = next;
+      return ok({ role: b.role, ...next });
     },
     "GET /v1/admin/setup/email": () => ok({ email: w.email }),
     "PUT /v1/admin/setup/email": (_u, init) => {
@@ -301,7 +308,7 @@ describe("Setup wizard", () => {
     change("Tên miền công ty", "https://Acme.vn/");
     fireEvent.click(screen.getByRole("button", { name: "Tạo bằng AI" }));
     await waitFor(() => expect(w.calls.generate).toHaveLength(1));
-    expect(w.calls.generate![0]).toMatchObject({ domain: "acme.vn", language: "vi", extraUrls: [] });
+    expect(w.calls.generate![0]).toMatchObject({ domain: "acme.vn", language: "vi", extraUrls: [], includeFanpage: true });
 
     const log = await screen.findByRole("log", { name: /tiến trình/i });
     expect(log.getAttribute("aria-live")).toBe("polite");
@@ -400,6 +407,39 @@ describe("Setup wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Lưu tất cả" }));
     await waitFor(() => expect(w.calls.putKb).toHaveLength(2));
     expect(w.calls.putKb![1].files.map((f: any) => f.relPath)).toEqual(["icp.md", "sales-playbook.md"]);
+  });
+
+  it("role KB: Fanpage Manager tab loads its own KB, offers the AI draft with open questions, and saves with its own role", async () => {
+    const job: any = doneJob();
+    job.result.fanpageKb = {
+      role: "fanpage-manager",
+      files: [
+        { relPath: "page-voice.md", title: "Giọng Page", body: "# Giọng Page\n\nThân thiện, xưng “bên mình”." },
+        { relPath: "content-pillars.md", title: "Nhóm nội dung", body: "# Nhóm nội dung\n\nTính năng mới, mẹo dùng." },
+        { relPath: "comment-policy.md", title: "Chính sách bình luận", body: "# Chính sách bình luận\n\nKhiếu nại chuyển cho người." },
+      ],
+    };
+    job.result.openQuestions = ["Chính sách hoàn tiền là gì?", "Fanpage: page-voice.md — số bài mỗi tuần là đề xuất, chủ Page cần xác nhận"];
+    const { w } = mount("/setup?step=kb", {
+      roleKb: { source: "override", files: [{ relPath: "icp.md", title: "ICP", body: "# ICP\n\nOK", hasPlaceholders: false }] },
+      fanpageKb: { source: "template", files: [{ relPath: "page-voice.md", title: "Voice", body: "# Voice\n\nTODO", hasPlaceholders: true }] },
+      jobs: [job],
+    });
+    await screen.findByRole("tab", { name: "icp.md" });
+    fireEvent.click(screen.getByRole("button", { name: "Fanpage Manager" }));
+    expect((await screen.findAllByRole("tab")).map((t) => t.textContent)).toEqual(["page-voice.md ⚠"]);
+
+    // Only the open questions the AI flagged for the Page are shown here, without the "Fanpage:" prefix.
+    expect(screen.getByText(/số bài mỗi tuần là đề xuất/)).toBeTruthy();
+    expect(screen.queryByText(/hoàn tiền/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dùng bản AI tạo" }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Thay bằng bản AI" }));
+    await waitFor(() => expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["page-voice.md", "content-pillars.md", "comment-policy.md"]));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu tất cả" }));
+    await waitFor(() => expect(w.calls.putKb).toHaveLength(1));
+    expect(w.calls.putKb![0].role).toBe("fanpage-manager");
+    expect(w.calls.putKb![0].files.map((f: any) => f.relPath)).toEqual(["page-voice.md", "content-pillars.md", "comment-policy.md"]);
   });
 
   it("email: Gmail preset fills servers, test shows IMAP and SMTP separately, save sends the shared password", async () => {

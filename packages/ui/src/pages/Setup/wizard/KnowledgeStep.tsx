@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GeneratedRoleKbFile } from "../../../api/setupWizard.ts";
 import { ApiError } from "../../../api/client.ts";
 import { setupWizardApi } from "../../../api/setupWizard.ts";
 import { useApi } from "../../../hooks/useApi.ts";
@@ -8,6 +9,7 @@ import { useToast } from "../../../components/Toast.tsx";
 import { useRegisterStep, useWizard } from "./WizardContext.tsx";
 
 type Origin = "template" | "custom" | "ai";
+type KbRole = "sales-sdr" | "fanpage-manager";
 interface KbFile {
   relPath: string;
   title: string;
@@ -35,11 +37,27 @@ function signature(files: KbFile[]): string {
   return JSON.stringify(files.map((f) => [f.relPath, f.body]));
 }
 
-/** Step 2: edit the sales knowledge base (role KB) that overrides the built-in templates. */
-export function KnowledgeStep() {
-  const { jobs, refreshReadiness } = useWizard();
+const ROLES: { role: KbRole; label: string; saved: string; intro: string }[] = [
+  {
+    role: "sales-sdr",
+    label: "Agent SDR",
+    saved: "Đã lưu kiến thức bán hàng.",
+    intro: "Đây là “sổ tay” agent SDR dùng khi viết email: khách hàng lý tưởng, cách tiếp cận, cách trả lời phản đối. Chỉnh cho đúng công ty bạn.",
+  },
+  {
+    role: "fanpage-manager",
+    label: "Fanpage Manager",
+    saved: "Đã lưu kiến thức Fanpage.",
+    intro:
+      "Đây là “sổ tay” agent Fanpage Manager dùng khi soạn bài và trả lời bình luận: giọng văn của Page, các nhóm nội dung, chính sách bình luận. Agent sẽ bị tạm dừng nếu còn chữ TODO/placeholder trong các tệp này.",
+  },
+];
+
+/** Editing state for one role's knowledge base (loaded from, and saved to, the role override). */
+function useRoleKb(role: KbRole, aiFiles: GeneratedRoleKbFile[], savedMessage: string) {
+  const { refreshReadiness } = useWizard();
   const { notify } = useToast();
-  const kb = useApi(() => setupWizardApi.getRoleKb("sales-sdr"), []);
+  const kb = useApi(() => setupWizardApi.getRoleKb(role), [role]);
 
   const [files, setFiles] = useState<KbFile[] | null>(null);
   const [baseline, setBaseline] = useState("");
@@ -71,10 +89,9 @@ export function KnowledgeStep() {
   }, [kb.data, load]);
 
   const dirty = files !== null && signature(files) !== baseline;
-  const aiFiles = jobs.latestDone?.result?.roleKb.files ?? [];
 
   async function save(): Promise<boolean> {
-    if (!files) return true;
+    if (!files || !dirty) return true;
     const bad = files.find((f) => !FILE_RE.test(f.relPath) || f.body.trim().length === 0);
     if (bad) {
       setSaveError(`Tệp “${bad.relPath}” cần có tên dạng ten-tep.md và nội dung không được để trống.`);
@@ -83,9 +100,9 @@ export function KnowledgeStep() {
     setSaving(true);
     setSaveError(null);
     try {
-      const res = await setupWizardApi.putRoleKb({ role: "sales-sdr", files: files.map((f) => ({ relPath: f.relPath, body: f.body })) });
+      const res = await setupWizardApi.putRoleKb({ role, files: files.map((f) => ({ relPath: f.relPath, body: f.body })) });
       load(res);
-      notify("Đã lưu kiến thức bán hàng.", "success");
+      notify(savedMessage, "success");
       refreshReadiness();
       return true;
     } catch (err) {
@@ -95,7 +112,6 @@ export function KnowledgeStep() {
       setSaving(false);
     }
   }
-  useRegisterStep(dirty, save);
 
   function update(i: number, body: string) {
     setFiles((prev) => prev && prev.map((f, idx) => (idx === i ? { ...f, body } : f)));
@@ -119,29 +135,62 @@ export function KnowledgeStep() {
   }
 
   function applyAi() {
-    const list: KbFile[] = aiFiles.map((f) => ({
-      relPath: f.relPath,
-      title: f.title,
-      body: f.body,
-      hasPlaceholders: false,
-      origin: "ai",
-      originalBody: null,
-    }));
-    setFiles(list);
+    setFiles(aiFiles.map((f) => ({ relPath: f.relPath, title: f.title, body: f.body, hasPlaceholders: false, origin: "ai", originalBody: null })));
     setActive(0);
   }
 
+  return {
+    role, kb, files, source, dirty, active, setActive, newName, setNewName, nameError, confirmAi, setConfirmAi, confirmRemove, setConfirmRemove,
+    saving, saveError, save, update, addFile, removeFile, applyAi, aiFiles,
+  };
+}
+type RoleKbState = ReturnType<typeof useRoleKb>;
+
+/** Step 2: edit the role knowledge bases (SDR sales KB, Fanpage Manager KB) that override the built-in templates. */
+export function KnowledgeStep() {
+  const { jobs } = useWizard();
+  const result = jobs.latestDone?.result ?? null;
+  const sdr = useRoleKb("sales-sdr", result?.roleKb.files ?? [], ROLES[0]!.saved);
+  const fanpage = useRoleKb("fanpage-manager", result?.fanpageKb?.files ?? [], ROLES[1]!.saved);
+  const [role, setRole] = useState<KbRole>("sales-sdr");
+  const editors = { "sales-sdr": sdr, "fanpage-manager": fanpage };
+
+  // Saving the step saves every role that has unsaved edits, so switching roles never loses work.
+  useRegisterStep(sdr.dirty || fanpage.dirty, async () => {
+    const a = await sdr.save();
+    const b = await fanpage.save();
+    return a && b;
+  });
+
+  const def = ROLES.find((r) => r.role === role)!;
+  const fanpageQuestions = (result?.openQuestions ?? []).filter((q) => /^Fanpage:/i.test(q));
+
+  return (
+    <div className="wz-step-body">
+      <h2 className="wz-title">2. Kiến thức cho agent</h2>
+      <div className="wz-badges" role="group" aria-label="Chọn agent">
+        {ROLES.map((r) => (
+          <button key={r.role} type="button" className={r.role === role ? "btn btn-sm btn-primary" : "btn btn-sm"} aria-pressed={r.role === role} onClick={() => setRole(r.role)}>
+            {r.label}
+            {editors[r.role].dirty ? " •" : ""}
+          </button>
+        ))}
+      </div>
+      <p className="muted">{def.intro}</p>
+      <RoleKbEditor ed={editors[role]} domain={jobs.latestDone?.domain} questions={role === "fanpage-manager" ? fanpageQuestions : []} />
+    </div>
+  );
+}
+
+function RoleKbEditor({ ed, domain, questions }: { ed: RoleKbState; domain: string | undefined; questions: string[] }) {
+  const { kb, files, source, dirty, active, newName, nameError, confirmAi, confirmRemove, saving, saveError, aiFiles } = ed;
+  const idp = ed.role === "sales-sdr" ? "kb" : "fb";
   const withPlaceholders = useMemo(() => (files ?? []).filter(placeholders), [files]);
   const current = files?.[Math.min(active, (files?.length ?? 1) - 1)] ?? null;
   const currentIdx = current && files ? files.indexOf(current) : 0;
 
   return (
-    <div className="wz-step-body">
-      <h2 className="wz-title">2. Kiến thức bán hàng</h2>
-      <p className="muted">
-        Đây là “sổ tay” agent SDR dùng khi viết email: khách hàng lý tưởng, cách tiếp cận, cách trả lời phản đối. Chỉnh cho đúng công ty bạn.
-      </p>
-
+    <>
       {kb.error && (
         <p className="form-error" role="alert">
           {kb.error}
@@ -156,12 +205,23 @@ export function KnowledgeStep() {
       )}
 
       {aiFiles.length > 0 && (
-        <section className="card wz-card" aria-labelledby="kb-ai-heading">
-          <h3 id="kb-ai-heading">Bản AI tạo từ {jobs.latestDone?.domain}</h3>
+        <section className="card wz-card" aria-labelledby={`${idp}-ai-heading`}>
+          <h3 id={`${idp}-ai-heading`}>Bản AI tạo từ {domain}</h3>
           <p className="muted">AI đã soạn {aiFiles.length} tệp: {aiFiles.map((f) => f.relPath).join(", ")}. Dùng bản này sẽ thay toàn bộ các tệp hiện tại; chưa lưu cho đến khi bạn bấm “Lưu tất cả”.</p>
-          <button type="button" className="btn" onClick={() => setConfirmAi(true)}>
+          <button type="button" className="btn" onClick={() => ed.setConfirmAi(true)}>
             Dùng bản AI tạo
           </button>
+          {questions.length > 0 && (
+            <div className="wz-callout" role="group" aria-label="Cần chủ Page xác nhận">
+              <h4>Cần chủ Page xác nhận</h4>
+              <p className="muted">Website không nói rõ các điểm này nên AI đề xuất tạm; hãy kiểm tra trước khi lưu:</p>
+              <ul>
+                {questions.map((q, i) => (
+                  <li key={i}>{q.replace(/^Fanpage:\s*/i, "")}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
@@ -173,11 +233,11 @@ export function KnowledgeStep() {
                 key={f.relPath}
                 type="button"
                 role="tab"
-                id={`kbtab-${i}`}
+                id={`${idp}tab-${i}`}
                 aria-selected={i === currentIdx}
-                aria-controls="kb-panel"
+                aria-controls={`${idp}-panel`}
                 className={i === currentIdx ? "tab active" : "tab"}
-                onClick={() => setActive(i)}
+                onClick={() => ed.setActive(i)}
               >
                 {f.relPath}
                 {placeholders(f) && <span aria-label="còn placeholder" title="Còn placeholder"> ⚠</span>}
@@ -186,18 +246,18 @@ export function KnowledgeStep() {
           </div>
 
           {current && (
-            <div id="kb-panel" role="tabpanel" aria-labelledby={`kbtab-${currentIdx}`}>
+            <div id={`${idp}-panel`} role="tabpanel" aria-labelledby={`${idp}tab-${currentIdx}`}>
               <div className="wz-badges">
                 <span className={`pill ${ORIGIN_BADGE[current.origin].cls}`}>{ORIGIN_BADGE[current.origin].label}</span>
                 {placeholders(current) && <span className="pill pill-warning">⚠ Còn placeholder</span>}
-                <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmRemove(current.relPath)} disabled={files.length <= 1}>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={() => ed.setConfirmRemove(current.relPath)} disabled={files.length <= 1}>
                   Xoá tệp này
                 </button>
               </div>
               <div className="wz-editor">
                 <div className="field">
-                  <label htmlFor="kb-editor">Nội dung {current.relPath} (Markdown)</label>
-                  <textarea id="kb-editor" className="wz-mono" rows={18} value={current.body} spellCheck={false} onChange={(e) => update(currentIdx, e.target.value)} />
+                  <label htmlFor={`${idp}-editor`}>Nội dung {current.relPath} (Markdown)</label>
+                  <textarea id={`${idp}-editor`} className="wz-mono" rows={18} value={current.body} spellCheck={false} onChange={(e) => ed.update(currentIdx, e.target.value)} />
                 </div>
                 <div className="wz-preview" aria-label="Xem trước">
                   <div className="wz-preview-label">Xem trước</div>
@@ -209,10 +269,10 @@ export function KnowledgeStep() {
 
           <div className="wz-add">
             <div className="field">
-              <label htmlFor="kb-new">Thêm tệp mới</label>
+              <label htmlFor={`${idp}-new`}>Thêm tệp mới</label>
               <div className="wz-inline">
-                <input id="kb-new" type="text" value={newName} placeholder="vd: bang-gia.md" onChange={(e) => setNewName(e.target.value)} />
-                <button type="button" className="btn" onClick={addFile}>
+                <input id={`${idp}-new`} type="text" value={newName} placeholder="vd: bang-gia.md" onChange={(e) => ed.setNewName(e.target.value)} />
+                <button type="button" className="btn" onClick={ed.addFile}>
                   Thêm tệp
                 </button>
               </div>
@@ -231,7 +291,7 @@ export function KnowledgeStep() {
             </p>
           )}
           <div className="wz-actions">
-            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || !dirty} aria-busy={saving}>
+            <button type="button" className="btn btn-primary" onClick={() => void ed.save()} disabled={saving || !dirty} aria-busy={saving}>
               {saving ? "Đang lưu…" : "Lưu tất cả"}
             </button>
             {dirty && <span className="setup-hint">Có thay đổi chưa lưu.</span>}
@@ -246,10 +306,10 @@ export function KnowledgeStep() {
           confirmLabel="Thay bằng bản AI"
           cancelLabel="Giữ bản hiện tại"
           destructive
-          onCancel={() => setConfirmAi(false)}
+          onCancel={() => ed.setConfirmAi(false)}
           onConfirm={() => {
-            setConfirmAi(false);
-            applyAi();
+            ed.setConfirmAi(false);
+            ed.applyAi();
           }}
         />
       )}
@@ -260,13 +320,13 @@ export function KnowledgeStep() {
           confirmLabel="Xoá tệp"
           cancelLabel="Giữ lại"
           destructive
-          onCancel={() => setConfirmRemove(null)}
+          onCancel={() => ed.setConfirmRemove(null)}
           onConfirm={() => {
-            removeFile(confirmRemove);
-            setConfirmRemove(null);
+            ed.removeFile(confirmRemove);
+            ed.setConfirmRemove(null);
           }}
         />
       )}
-    </div>
+    </>
   );
 }
