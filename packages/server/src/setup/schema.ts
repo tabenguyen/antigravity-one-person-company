@@ -5,13 +5,24 @@
 // list is fed back to the model verbatim in the single repair turn.
 
 import { z } from "zod";
-import type { GeneratedSetup } from "../admin-types.ts";
+import type { GeneratedRoleKbFile, GeneratedSetup } from "../admin-types.ts";
 import { CompanyProfileInputZ } from "../admin-types.ts";
 import { findPlaceholder, placeholderMarkers } from "../readiness/placeholders.ts";
 
 export const REQUIRED_ROLE_KB_FILES = ["icp.md", "sales-playbook.md", "objection-handling.md"] as const;
+export const REQUIRED_FANPAGE_KB_FILES = ["page-voice.md", "content-pillars.md", "comment-policy.md"] as const;
 const MIN_KB_BODY_CHARS = 200;
-const FIELD_FOR_FILE: Record<string, string> = { "icp.md": "icp", "sales-playbook.md": "salesPlaybook", "objection-handling.md": "objectionHandling" };
+const SDR_FLAT_KEYS: [string, string][] = [
+  ["icp", "icp.md"],
+  ["salesPlaybook", "sales-playbook.md"],
+  ["objectionHandling", "objection-handling.md"],
+];
+const FANPAGE_FLAT_KEYS: [string, string][] = [
+  ["pageVoice", "page-voice.md"],
+  ["contentPillars", "content-pillars.md"],
+  ["commentPolicy", "comment-policy.md"],
+];
+const FIELD_FOR_FILE: Record<string, string> = Object.fromEntries([...SDR_FLAT_KEYS, ...FANPAGE_FLAT_KEYS].map(([k, f]) => [f, k]));
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 const str = { type: "string" } as const;
@@ -61,6 +72,17 @@ export const GENERATED_SETUP_JSON_SCHEMA = {
         objectionHandling: { ...str, description: "Markdown for objection-handling.md" },
       },
       required: ["icp", "salesPlaybook", "objectionHandling"],
+    },
+    fanpageKb: {
+      type: "object",
+      description:
+        "Three markdown documents for the AI Fanpage Manager (each a single string with newlines, starting with an H1, no placeholders). Best effort from the website; what the pages do not say goes in openQuestions",
+      properties: {
+        pageVoice: { ...str, description: "Markdown for page-voice.md: audience, voice, always/never, posting rhythm" },
+        contentPillars: { ...str, description: "Markdown for content-pillars.md: pillars table, topics to avoid, where facts live" },
+        commentPolicy: { ...str, description: "Markdown for comment-policy.md: always-human topics with owners, hide rules, where to send people, response targets" },
+      },
+      required: ["pageVoice", "contentPillars", "commentPolicy"],
     },
     suggestedSender: {
       type: "object",
@@ -112,15 +134,10 @@ const textList = z
 type RoleKbFileRaw = { relPath: string; title: string; body: string };
 
 /** Accepts {icp, salesPlaybook, objectionHandling}, {files:[{relPath,body}]} or {files:{"icp.md": "..."}}. */
-function normalizeRoleKb(raw: unknown): RoleKbFileRaw[] {
+function normalizeKb(raw: unknown, flat: [string, string][]): RoleKbFileRaw[] {
   if (!raw || typeof raw !== "object") return [];
   const o = raw as Record<string, unknown>;
   const out: RoleKbFileRaw[] = [];
-  const flat: [string, string][] = [
-    ["icp", "icp.md"],
-    ["salesPlaybook", "sales-playbook.md"],
-    ["objectionHandling", "objection-handling.md"],
-  ];
   for (const [key, rel] of flat) {
     if (typeof o[key] === "string") out.push({ relPath: rel, title: "", body: o[key] as string });
   }
@@ -142,7 +159,8 @@ function normalizeRoleKb(raw: unknown): RoleKbFileRaw[] {
 
 const RawGeneratedZ = z.object({
   profile: z.record(z.unknown()),
-  roleKb: z.unknown().transform(normalizeRoleKb),
+  roleKb: z.unknown().transform((v) => normalizeKb(v, SDR_FLAT_KEYS)),
+  fanpageKb: z.unknown().transform((v) => normalizeKb(v, FANPAGE_FLAT_KEYS)),
   suggestedSender: z
     .object({ name: nullableText, address: nullableText, companyAddressLine: nullableText, unsubscribeMailto: nullableText })
     .default({ name: null, address: null, companyAddressLine: null, unsubscribeMailto: null }),
@@ -165,10 +183,36 @@ function trimProfile(raw: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+export interface ValidateOptions {
+  /** Require (and validate) the Fanpage Manager KB too. */
+  includeFanpage?: boolean;
+}
+
+/** Per-file checks (name, duplicates, length, placeholders) plus presence of every required file. */
+function checkKbFiles(prefix: string, files: RoleKbFileRaw[], required: readonly string[], errors: string[]): void {
+  const seen = new Set<string>();
+  for (const [i, f] of files.entries()) {
+    const label = `${prefix}.${FIELD_FOR_FILE[f.relPath] ?? `files[${i}]`} (${f.relPath || "no name"})`;
+    if (!/^[\w-]+\.md$/.test(f.relPath)) errors.push(`${label}: relPath must look like "icp.md" (letters, digits, - and _ only)`);
+    if (seen.has(f.relPath)) errors.push(`${label}: duplicate relPath`);
+    seen.add(f.relPath);
+    if (f.body.trim().length < MIN_KB_BODY_CHARS) errors.push(`${label}: body is too short (${f.body.trim().length} chars); write the full document`);
+    const hit = findPlaceholder(f.body);
+    if (hit) errors.push(`${label}: placeholder text on line ${hit.line} (${hit.marker}): "${hit.text}"`);
+  }
+  for (const file of required) {
+    if (!seen.has(file)) errors.push(`${prefix}.${FIELD_FOR_FILE[file]}: missing required file ${file}; write it as one markdown string`);
+  }
+}
+
+function finishKbFiles(files: RoleKbFileRaw[]): GeneratedRoleKbFile[] {
+  return files.map((f) => ({ relPath: f.relPath, title: f.title.trim() || f.relPath.replace(/\.md$/, ""), body: f.body.trim() + "\n" }));
+}
+
 export type ValidationResult = { ok: true; setup: GeneratedSetup; warnings: string[] } | { ok: false; errors: string[] };
 
 /** Everything the human would otherwise discover later: schema, placeholders, KB completeness, sane sources. */
-export function validateGenerated(raw: unknown): ValidationResult {
+export function validateGenerated(raw: unknown, opts: ValidateOptions = {}): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const shape = RawGeneratedZ.safeParse(raw);
@@ -192,19 +236,8 @@ export function validateGenerated(raw: unknown): ValidationResult {
     if (markers.length > 0) errors.push(`profile.${field}: contains placeholder text (${markers.join(", ")}); write real content`);
   }
 
-  const seen = new Set<string>();
-  for (const [i, f] of data.roleKb.entries()) {
-    const label = `roleKb.${FIELD_FOR_FILE[f.relPath] ?? `files[${i}]`} (${f.relPath || "no name"})`;
-    if (!/^[\w-]+\.md$/.test(f.relPath)) errors.push(`${label}: relPath must look like "icp.md" (letters, digits, - and _ only)`);
-    if (seen.has(f.relPath)) errors.push(`${label}: duplicate relPath`);
-    seen.add(f.relPath);
-    if (f.body.trim().length < MIN_KB_BODY_CHARS) errors.push(`${label}: body is too short (${f.body.trim().length} chars); write the full document`);
-    const hit = findPlaceholder(f.body);
-    if (hit) errors.push(`${label}: placeholder text on line ${hit.line} (${hit.marker}): "${hit.text}"`);
-  }
-  for (const required of REQUIRED_ROLE_KB_FILES) {
-    if (!seen.has(required)) errors.push(`roleKb.${FIELD_FOR_FILE[required]}: missing required file ${required}; write it as one markdown string`);
-  }
+  checkKbFiles("roleKb", data.roleKb, REQUIRED_ROLE_KB_FILES, errors);
+  if (opts.includeFanpage) checkKbFiles("fanpageKb", data.fanpageKb, REQUIRED_FANPAGE_KB_FILES, errors);
 
   const sources: GeneratedSetup["sources"] = [];
   for (const s of data.sources) {
@@ -232,10 +265,8 @@ export function validateGenerated(raw: unknown): ValidationResult {
   if (errors.length > 0 || !profile) return { ok: false, errors };
   const setup: GeneratedSetup = {
     profile: profile as GeneratedSetup["profile"],
-    roleKb: {
-      role: "sales-sdr",
-      files: data.roleKb.map((f) => ({ relPath: f.relPath, title: f.title.trim() || f.relPath.replace(/\.md$/, ""), body: f.body.trim() + "\n" })),
-    },
+    roleKb: { role: "sales-sdr", files: finishKbFiles(data.roleKb) },
+    ...(opts.includeFanpage ? { fanpageKb: { role: "fanpage-manager" as const, files: finishKbFiles(data.fanpageKb) } } : {}),
     suggestedSender: sender,
     sources,
     conflicts: data.conflicts,

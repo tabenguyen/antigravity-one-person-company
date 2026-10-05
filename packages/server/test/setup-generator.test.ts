@@ -37,6 +37,13 @@ function validResult(): Record<string, unknown> {
         { relPath: "objection-handling.md", title: "Objections", body: kbBody("Objections") },
       ],
     },
+    fanpageKb: {
+      files: [
+        { relPath: "page-voice.md", title: "Voice", body: kbBody("Page voice") },
+        { relPath: "content-pillars.md", title: "Pillars", body: kbBody("Content pillars") },
+        { relPath: "comment-policy.md", title: "Comment policy", body: kbBody("Comment policy") },
+      ],
+    },
     suggestedSender: { name: "Acme Sales", address: "sales@acme.example", companyAddressLine: "Acme Ltd, 1 Nguyen Hue, HCMC", unsubscribeMailto: null },
     sources: [{ url: "https://acme.example/", title: "Home" }],
     conflicts: ["Pricing: acme.example/pricing says 500.000đ but old.acme.example says 300.000đ"],
@@ -98,6 +105,8 @@ describe("POST /v1/admin/setup/generate", () => {
     expect(result.profile.companyName).toBe("Acme Logistics");
     expect(result.roleKb.role).toBe("sales-sdr");
     expect(result.roleKb.files.map((f) => f.relPath)).toEqual(["icp.md", "sales-playbook.md", "objection-handling.md"]);
+    expect(result.fanpageKb?.role).toBe("fanpage-manager");
+    expect(result.fanpageKb?.files.map((f) => f.relPath)).toEqual(["page-voice.md", "content-pillars.md", "comment-policy.md"]);
     expect(result.conflicts).toHaveLength(1);
     expect(result.sources).toEqual([{ url: "https://acme.example/", title: "Home" }]);
     expect(job.usage).toEqual({ inputTokens: 100, outputTokens: 50 });
@@ -120,6 +129,8 @@ describe("POST /v1/admin/setup/generate", () => {
     expect(prompt).toContain("https://acme.example");
     expect(prompt).toContain("https://acme.example/faq");
     expect(prompt).toContain("pricing on /pricing is current");
+    expect(prompt).toContain("fanpageKb"); // Fanpage KB is requested by default
+    expect(prompt).toContain("openQuestions");
     expect(prompt).toMatch(/English/);
     expect(prompt).toMatch(/conflicts/);
     expect(prompt).toMatch(/at most 12 pages/);
@@ -177,6 +188,17 @@ describe("POST /v1/admin/setup/generate", () => {
     expect((await t.call("GET", "/v1/admin/setup/generate")).body.data.jobs.map((j: SetupJob) => j.id)).toEqual([next.body.data.job.id, first.id]);
   });
 
+  it("includeFanpage=false leaves the Fanpage KB out of the prompt and the result", async () => {
+    const noFp = validResult() as any;
+    delete noFp.fanpageKb;
+    script([{ kind: "ok", structured: noFp }]);
+    const job0 = (await t.call("POST", "/v1/admin/setup/generate", { domain: "acme.example", includeFanpage: false })).body.data.job as SetupJob;
+    const job = await settle(job0.id);
+    expect(job.status).toBe("done");
+    expect((job.result as GeneratedSetup).fanpageKb).toBeUndefined();
+    expect(JSON.parse(invocations()[0].stdin).message.content as string).not.toContain("fanpageKb");
+  });
+
   it("a validation failure triggers ONE repair turn that resumes the same conversation with the exact errors", async () => {
     const bad = validResult() as any;
     bad.profile.pricingPolicy = "TODO fill in the price list from the website";
@@ -228,6 +250,7 @@ describe("POST /v1/admin/setup/generate", () => {
     odd.conflicts = [{ detail: "Pricing: /pricing says 500.000đ but old.acme.example says 300.000đ" }]; // object instead of string
     odd.openQuestions = [{ question: "Is there a booking link?" }, "  "];
     odd.roleKb = { icp: kbBody("ICP"), salesPlaybook: kbBody("Playbook"), objectionHandling: kbBody("Objections") }; // flat form
+    odd.fanpageKb = { pageVoice: kbBody("Voice"), contentPillars: kbBody("Pillars"), commentPolicy: kbBody("Policy") };
     script([{ kind: "no_structured", text: "Here you go:\n```json\n" + JSON.stringify(odd) + "\n```" }]);
     const job = await settle(((await t.call("POST", "/v1/admin/setup/generate", { domain: "acme.example" })).body.data.job as SetupJob).id);
     expect(job.status).toBe("done");
@@ -237,13 +260,14 @@ describe("POST /v1/admin/setup/generate", () => {
     expect(r.conflicts).toEqual(["Pricing: /pricing says 500.000đ but old.acme.example says 300.000đ"]);
     expect(r.openQuestions).toEqual(["Is there a booking link?"]);
     expect(r.roleKb.files.map((f) => f.relPath)).toEqual(["icp.md", "sales-playbook.md", "objection-handling.md"]);
+    expect(r.fanpageKb?.files.map((f) => f.relPath)).toEqual(["page-voice.md", "content-pillars.md", "comment-policy.md"]);
     expect(job.progress.some((p) => /JSON text instead of finish/.test(p.line))).toBe(true);
   });
 
   it("abortAll (daemon shutdown) winds a hung job down and marks it cancelled", async () => {
     script([{ kind: "hang" }]);
     const manager = new SetupJobManager({ config: t.config, db: openTestDb(), bus: new EventBus(), dnsCheck: false, brainRoot: path.join(tmp, "brain"), timeoutMs: 1000 });
-    const job = manager.start({ domain: "acme.example", extraUrls: [], language: "vi" });
+    const job = manager.start({ domain: "acme.example", extraUrls: [], language: "vi", includeFanpage: true });
     await waitFor(() => invocations().length === 1, 5000);
     await manager.abortAll();
     expect(manager.get(job.id)).toMatchObject({ status: "cancelled", error: "daemon shutting down" });
@@ -271,7 +295,7 @@ describe("job persistence", () => {
     const generate = async () => ({ setup: v.setup, usage: { inputTokens: 1, outputTokens: 1 }, conversationId: null, repaired: false, fetchedUrls: [] });
     const manager = new SetupJobManager({ config: makeTestConfig(), db, bus: new EventBus(), generate });
     for (let i = 0; i < MAX_JOBS + 3; i++) {
-      const j = manager.start({ domain: `d${i}.com`, extraUrls: [], language: "vi" });
+      const j = manager.start({ domain: `d${i}.com`, extraUrls: [], language: "vi", includeFanpage: true });
       await manager.waitFor(j.id);
     }
     expect(manager.list()).toHaveLength(MAX_JOBS);
@@ -316,6 +340,35 @@ describe("validateGenerated", () => {
     }
     expect(validateGenerated({}).ok).toBe(false);
     expect(validateGenerated(null).ok).toBe(false);
+  });
+
+  it("validates the Fanpage KB only when asked: required files, length and placeholders, with fanpageKb-prefixed errors", () => {
+    const withFanpage = validateGenerated(validResult(), { includeFanpage: true });
+    expect(withFanpage.ok).toBe(true);
+    if (withFanpage.ok) expect(withFanpage.setup.fanpageKb?.files.map((f) => f.relPath)).toEqual(["page-voice.md", "content-pillars.md", "comment-policy.md"]);
+
+    // not requested -> not required, not returned
+    const noFanpage = validResult() as any;
+    delete noFanpage.fanpageKb;
+    const off = validateGenerated(noFanpage);
+    expect(off.ok).toBe(true);
+    if (off.ok) expect(off.setup.fanpageKb).toBeUndefined();
+
+    // requested but missing / placeholder-ridden / too short
+    const bad = validResult() as any;
+    bad.fanpageKb.files = [
+      { relPath: "page-voice.md", title: "Voice", body: "# Voice\n\nPosting rhythm: TODO\n" + "x".repeat(300) },
+      { relPath: "content-pillars.md", title: "Pillars", body: "short" },
+    ];
+    const r = validateGenerated(bad, { includeFanpage: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const all = r.errors.join("\n");
+      expect(all).toMatch(/fanpageKb\.pageVoice \(page-voice\.md\): placeholder text on line 3 \(TODO\)/);
+      expect(all).toMatch(/fanpageKb\.contentPillars \(content-pillars\.md\): body is too short/);
+      expect(all).toMatch(/fanpageKb\.commentPolicy: missing required file comment-policy\.md/);
+    }
+    expect(validateGenerated(noFanpage, { includeFanpage: true }).ok).toBe(false);
   });
 
   it("drops an invalid suggested sender address instead of failing the whole result", () => {

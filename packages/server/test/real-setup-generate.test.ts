@@ -30,7 +30,7 @@ run("real setup generation (opt-in, AGYHQ_REAL_AGY=1)", () => {
       const domain = process.env.AGYHQ_SETUP_DOMAIN ?? "tracuuhddt.com";
       const model = process.env.AGYHQ_SETUP_MODEL ?? "gemini-3.8-flash-high";
       const started = Date.now();
-      const job = manager.start({ domain, extraUrls: [], language: "vi", model });
+      const job = manager.start({ domain, extraUrls: [], language: "vi", includeFanpage: true, model });
       await manager.waitFor(job.id);
       const done = manager.get(job.id)!;
       const out = process.env.AGYHQ_SETUP_OUT;
@@ -39,6 +39,7 @@ run("real setup generation (opt-in, AGYHQ_REAL_AGY=1)", () => {
       expect(done.error).toBeNull();
       expect(done.status).toBe("done");
       expect(done.result!.roleKb.files).toHaveLength(3);
+      expect(done.result!.fanpageKb?.files).toHaveLength(3);
     },
     20 * 60_000,
   );

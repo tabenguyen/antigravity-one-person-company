@@ -505,11 +505,12 @@ export const GenerateSetupRequestZ = z.object({
   notes: z.string().max(2000).optional(), // guidance, e.g. "pricing on /pricing is current; ignore the beta site"
   model: z.string().optional(), // default: config setup model or the sales-sdr template defaultModel
   language: z.enum(["vi", "en"]).default("vi"), // language of generated KB prose
+  includeFanpage: z.boolean().default(true), // also draft the Fanpage Manager KB (page voice, content pillars, comment policy)
 });
 export type GenerateSetupRequest = z.input<typeof GenerateSetupRequestZ>;
 
 export interface GeneratedRoleKbFile {
-  relPath: string; // e.g. "icp.md", "sales-playbook.md", "objection-handling.md"
+  relPath: string; // e.g. "icp.md", "sales-playbook.md", "objection-handling.md", "page-voice.md"
   title: string;
   body: string; // markdown, no placeholders
 }
@@ -517,6 +518,8 @@ export interface GeneratedRoleKbFile {
 export interface GeneratedSetup {
   profile: CompanyProfileInput; // validated against CompanyProfileInputZ before the job is marked done
   roleKb: { role: "sales-sdr"; files: GeneratedRoleKbFile[] };
+  /** Best-effort Fanpage Manager KB; absent on jobs generated before it existed or with includeFanpage=false. */
+  fanpageKb?: { role: "fanpage-manager"; files: GeneratedRoleKbFile[] };
   suggestedSender: { name: string | null; address: string | null; companyAddressLine: string | null; unsubscribeMailto: string | null };
   sources: { url: string; title: string | null }[]; // pages actually read
   conflicts: string[]; // contradictions found across pages (e.g. two different price lists)

@@ -49,6 +49,7 @@ export function GenerateCard({ jobs, defaultDomain, onSkip, showSkip }: { jobs: 
   const [urls, setUrls] = useState("");
   const [notes, setNotes] = useState("");
   const [language, setLanguage] = useState<"vi" | "en">("vi");
+  const [includeFanpage, setIncludeFanpage] = useState(true);
   const [model, setModel] = useState("");
   const [errors, setErrors] = useState<{ domain?: string; urls?: string }>({});
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +67,7 @@ export function GenerateCard({ jobs, defaultDomain, onSkip, showSkip }: { jobs: 
     setApiError(null);
     if (found.domain || found.urls || !d) return;
 
-    const body: GenerateSetupRequest = { domain: d, extraUrls: parsed.urls, language };
+    const body: GenerateSetupRequest = { domain: d, extraUrls: parsed.urls, language, includeFanpage };
     if (notes.trim()) body.notes = notes.trim();
     if (model.trim()) body.model = model.trim();
     setSubmitting(true);
@@ -88,7 +89,7 @@ export function GenerateCard({ jobs, defaultDomain, onSkip, showSkip }: { jobs: 
     <section className="card wz-card" aria-labelledby="gen-heading">
       <h3 id="gen-heading">Tạo bằng AI từ website</h3>
       <p className="muted">
-        Nhập tên miền công ty. AI chỉ đọc các trang công khai trên website, rồi soạn nháp hồ sơ công ty và kiến thức bán hàng.{" "}
+        Nhập tên miền công ty. AI chỉ đọc các trang công khai trên website, rồi soạn nháp hồ sơ công ty, kiến thức bán hàng cho agent SDR và (tuỳ chọn) kiến thức cho agent Fanpage Manager.{" "}
         <strong>Chưa có gì được lưu</strong> cho đến khi bạn xem lại và bấm lưu.
       </p>
       <form onSubmit={submit} noValidate aria-busy={submitting}>
@@ -144,6 +145,14 @@ export function GenerateCard({ jobs, defaultDomain, onSkip, showSkip }: { jobs: 
             <option value="vi">Tiếng Việt</option>
             <option value="en">English</option>
           </select>
+        </div>
+        <div className="field">
+          <label>
+            <input type="checkbox" checked={includeFanpage} onChange={(e) => setIncludeFanpage(e.target.checked)} /> Soạn cả kiến thức cho Fanpage Manager
+          </label>
+          <p className="setup-hint">
+            Giọng văn Page, nhóm nội dung, chính sách bình luận. Điểm nào website không nói rõ, AI đề xuất tạm và ghi vào danh sách “Cần xác nhận”.
+          </p>
         </div>
         <details className="wz-advanced">
           <summary>Nâng cao</summary>
